@@ -1,17 +1,16 @@
-# Inkplate-GUI-Designer
-Web app for designing GUI for Inkplate e-paper displays
+# React + Vite
 
-# Configuring Fonts
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-The GUI editor is capable of rendering fonts in an accurate way to how Adafruit
-GFX will render them on an Inkplate device.
+Currently, two official plugins are available:
 
-By default, `fonts.css` is configured with a list of the basic GNU FreeFont
-fonts typically used in the [Adafruit GFX font tutorial](https://learn.adafruit.com/adafruit-gfx-graphics-library/using-fonts).
-You can acquire the TTFs from their [project page](http://savannah.gnu.org/projects/freefont/)
-and place them in the `fonts/` folder for the GUI designer to use them.
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-To use custom fonts, place any TTF font in the `fonts/` folder, and update
-`fonts.css` to add references to them.
+## React Compiler
 
-If using hosted version, you can use all of the GNU FreeFont which is loaded by default.
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
