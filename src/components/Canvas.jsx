@@ -1,6 +1,108 @@
 import { useRef, useEffect, useCallback } from "react";
 import { useApp, ENTITY_TYPES } from "../context/AppContext";
 
+const HANDLE_SIZE = 8; // canvas px
+
+// ─── Resize handles ────────────────────────────────────────────────────────
+function getHandles(entity) {
+  const p = entity.params;
+  switch (entity.type) {
+    case ENTITY_TYPES.CIRCLE:
+      return [
+        { id: "r", x: p.cx + p.radius, y: p.cy },
+        { id: "l", x: p.cx - p.radius, y: p.cy },
+        { id: "t", x: p.cx, y: p.cy - p.radius },
+        { id: "b", x: p.cx, y: p.cy + p.radius },
+      ];
+    case ENTITY_TYPES.RECTANGLE:
+    case ENTITY_TYPES.BITMAP:
+    case ENTITY_TYPES.GRAPH:
+      return [
+        { id: "tl", x: p.x, y: p.y },
+        { id: "tr", x: p.x + p.width, y: p.y },
+        { id: "bl", x: p.x, y: p.y + p.height },
+        { id: "br", x: p.x + p.width, y: p.y + p.height },
+        { id: "tm", x: p.x + p.width / 2, y: p.y },
+        { id: "bm", x: p.x + p.width / 2, y: p.y + p.height },
+        { id: "ml", x: p.x, y: p.y + p.height / 2 },
+        { id: "mr", x: p.x + p.width, y: p.y + p.height / 2 },
+      ];
+    case ENTITY_TYPES.LINE:
+      return [
+        { id: "p0", x: p.x0, y: p.y0 },
+        { id: "p1", x: p.x1, y: p.y1 },
+      ];
+    case ENTITY_TYPES.TRIANGLE:
+      return [
+        { id: "v0", x: p.x0, y: p.y0 },
+        { id: "v1", x: p.x1, y: p.y1 },
+        { id: "v2", x: p.x2, y: p.y2 },
+      ];
+    case ENTITY_TYPES.CLOCK:
+      return [{ id: "r", x: p.x + p.radius, y: p.y }];
+    default:
+      return [];
+  }
+}
+
+function applyHandleDrag(entity, handleId, dx, dy) {
+  const p = { ...entity.params };
+  const ri = (v) => Math.round(v);
+
+  switch (entity.type) {
+    case ENTITY_TYPES.CIRCLE:
+      if (handleId === "r") p.radius = Math.max(1, ri(p.radius + dx));
+      if (handleId === "l") p.radius = Math.max(1, ri(p.radius - dx));
+      if (handleId === "b") p.radius = Math.max(1, ri(p.radius + dy));
+      if (handleId === "t") p.radius = Math.max(1, ri(p.radius - dy));
+      return p;
+
+    case ENTITY_TYPES.RECTANGLE:
+    case ENTITY_TYPES.BITMAP:
+    case ENTITY_TYPES.GRAPH:
+      if (handleId.includes("l")) {
+        p.width = Math.max(1, ri(p.width - dx));
+        p.x = ri(p.x + dx);
+      }
+      if (handleId.includes("r")) {
+        p.width = Math.max(1, ri(p.width + dx));
+      }
+      if (handleId.includes("t")) {
+        p.height = Math.max(1, ri(p.height - dy));
+        p.y = ri(p.y + dy);
+      }
+      if (handleId.includes("b")) {
+        p.height = Math.max(1, ri(p.height + dy));
+      }
+      return p;
+
+    case ENTITY_TYPES.LINE:
+      if (handleId === "p0") {
+        p.x0 = ri(p.x0 + dx);
+        p.y0 = ri(p.y0 + dy);
+      }
+      if (handleId === "p1") {
+        p.x1 = ri(p.x1 + dx);
+        p.y1 = ri(p.y1 + dy);
+      }
+      return p;
+
+    case ENTITY_TYPES.TRIANGLE: {
+      const n = handleId[1]; // "0" | "1" | "2"
+      p[`x${n}`] = ri(p[`x${n}`] + dx);
+      p[`y${n}`] = ri(p[`y${n}`] + dy);
+      return p;
+    }
+
+    case ENTITY_TYPES.CLOCK:
+      if (handleId === "r") p.radius = Math.max(1, ri(p.radius + dx));
+      return p;
+
+    default:
+      return p;
+  }
+}
+
 // ─── Canvas rendering ──────────────────────────────────────────────────────
 function renderEntity(ctx, entity) {
   const p = entity.params;
@@ -12,26 +114,22 @@ function renderEntity(ctx, entity) {
     case ENTITY_TYPES.PIXEL:
       ctx.fillRect(p.x, p.y, 2, 2);
       break;
-
     case ENTITY_TYPES.LINE:
       ctx.beginPath();
       ctx.moveTo(p.x0, p.y0);
       ctx.lineTo(p.x1, p.y1);
       ctx.stroke();
       break;
-
     case ENTITY_TYPES.RECTANGLE:
       if (p.fill) ctx.fillRect(p.x, p.y, p.width, p.height);
       else ctx.strokeRect(p.x, p.y, p.width, p.height);
       break;
-
     case ENTITY_TYPES.CIRCLE:
       ctx.beginPath();
       ctx.arc(p.cx, p.cy, p.radius, 0, Math.PI * 2);
       if (p.fill) ctx.fill();
       else ctx.stroke();
       break;
-
     case ENTITY_TYPES.TRIANGLE:
       ctx.beginPath();
       ctx.moveTo(p.x0, p.y0);
@@ -41,7 +139,6 @@ function renderEntity(ctx, entity) {
       if (p.fill) ctx.fill();
       else ctx.stroke();
       break;
-
     case ENTITY_TYPES.TEXT: {
       const size = (p.fontSize ?? 2) * 8;
       ctx.font = `${size}px "Courier New", monospace`;
@@ -49,9 +146,7 @@ function renderEntity(ctx, entity) {
       ctx.fillText(p.text ?? "", p.x, p.y + size);
       break;
     }
-
-    case ENTITY_TYPES.GRAPH: {
-      // placeholder wireframe
+    case ENTITY_TYPES.GRAPH:
       ctx.strokeStyle = "#555";
       ctx.setLineDash([4, 4]);
       ctx.strokeRect(p.x, p.y, p.width, p.height);
@@ -60,128 +155,205 @@ function renderEntity(ctx, entity) {
       ctx.fillStyle = "#888";
       ctx.fillText("Graph", p.x + 4, p.y + 14);
       break;
-    }
-
     case ENTITY_TYPES.CLOCK: {
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
       ctx.strokeStyle = p.color === 0 ? "#000" : "#fff";
       ctx.stroke();
-      // clock hands
       const now = new Date();
-      const hAngle = ((now.getHours() % 12) / 12) * Math.PI * 2 - Math.PI / 2;
-      const mAngle = (now.getMinutes() / 60) * Math.PI * 2 - Math.PI / 2;
+      const hAng = ((now.getHours() % 12) / 12) * Math.PI * 2 - Math.PI / 2;
+      const mAng = (now.getMinutes() / 60) * Math.PI * 2 - Math.PI / 2;
       ctx.beginPath();
       ctx.moveTo(p.x, p.y);
-      ctx.lineTo(p.x + Math.cos(hAngle) * p.radius * 0.5, p.y + Math.sin(hAngle) * p.radius * 0.5);
+      ctx.lineTo(
+        p.x + Math.cos(hAng) * p.radius * 0.5,
+        p.y + Math.sin(hAng) * p.radius * 0.5,
+      );
       ctx.stroke();
       ctx.beginPath();
       ctx.moveTo(p.x, p.y);
-      ctx.lineTo(p.x + Math.cos(mAngle) * p.radius * 0.7, p.y + Math.sin(mAngle) * p.radius * 0.7);
+      ctx.lineTo(
+        p.x + Math.cos(mAng) * p.radius * 0.7,
+        p.y + Math.sin(mAng) * p.radius * 0.7,
+      );
       ctx.stroke();
       break;
     }
-
     case ENTITY_TYPES.DIGITAL_CLOCK: {
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString();
       const size = (p.fontSize ?? 3) * 8;
       ctx.font = `${size}px "Courier New", monospace`;
       ctx.fillStyle = p.color === 0 ? "#000" : "#fff";
-      ctx.fillText(timeStr, p.x, p.y + size);
+      ctx.fillText(new Date().toLocaleTimeString(), p.x, p.y + size);
       break;
     }
-
     default:
       break;
   }
 }
 
-function renderSelectionHandle(ctx, entity) {
+function renderSelectionAndHandles(ctx, entity) {
   const p = entity.params;
-  ctx.strokeStyle = "#6d28d9";
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = "#6d28d9";
 
-  let x, y, w, h;
+  // Bounding box
+  let bx, by, bw, bh;
   switch (entity.type) {
     case ENTITY_TYPES.CIRCLE:
-      x = p.cx - p.radius - 6;
-      y = p.cy - p.radius - 6;
-      w = p.radius * 2 + 12;
-      h = p.radius * 2 + 12;
+      bx = p.cx - p.radius - 6;
+      by = p.cy - p.radius - 6;
+      bw = p.radius * 2 + 12;
+      bh = p.radius * 2 + 12;
       break;
     case ENTITY_TYPES.PIXEL:
-      x = p.x - 4; y = p.y - 4; w = 10; h = 10;
+      bx = p.x - 4;
+      by = p.y - 4;
+      bw = 10;
+      bh = 10;
       break;
     case ENTITY_TYPES.LINE:
-      x = Math.min(p.x0, p.x1) - 4;
-      y = Math.min(p.y0, p.y1) - 4;
-      w = Math.abs(p.x1 - p.x0) + 8;
-      h = Math.abs(p.y1 - p.y0) + 8;
+      bx = Math.min(p.x0, p.x1) - 4;
+      by = Math.min(p.y0, p.y1) - 4;
+      bw = Math.abs(p.x1 - p.x0) + 8;
+      bh = Math.abs(p.y1 - p.y0) + 8;
+      break;
+    case ENTITY_TYPES.TRIANGLE:
+      bx = Math.min(p.x0, p.x1, p.x2) - 6;
+      by = Math.min(p.y0, p.y1, p.y2) - 6;
+      bw = Math.max(p.x0, p.x1, p.x2) - bx + 6;
+      bh = Math.max(p.y0, p.y1, p.y2) - by + 6;
       break;
     default:
-      x = (p.x ?? p.cx ?? 0) - 6;
-      y = (p.y ?? p.cy ?? 0) - 6;
-      w = (p.width ?? p.radius * 2 ?? 80) + 12;
-      h = (p.height ?? p.radius * 2 ?? 40) + 12;
+      bx = (p.x ?? p.cx ?? 0) - 6;
+      by = (p.y ?? p.cy ?? 0) - 6;
+      bw = (p.width ?? (p.radius ? p.radius * 2 : 80)) + 12;
+      bh = (p.height ?? (p.radius ? p.radius * 2 : 40)) + 12;
   }
-
-  ctx.strokeRect(x, y, w, h);
+  ctx.strokeRect(bx, by, bw, bh);
   ctx.setLineDash([]);
+
+  // Handles
+  const half = HANDLE_SIZE / 2;
+  getHandles(entity).forEach((h) => {
+    ctx.fillStyle = "#fff";
+    ctx.strokeStyle = "#6d28d9";
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(h.x - half, h.y - half, HANDLE_SIZE, HANDLE_SIZE);
+    ctx.strokeRect(h.x - half, h.y - half, HANDLE_SIZE, HANDLE_SIZE);
+  });
 }
 
-// ─── Hit testing ───────────────────────────────────────────────────────────
+// ─── Hit testing ──────────────────────────────────────────────────────────
+function triSign(ax, ay, bx, by, cx, cy) {
+  return (ax - cx) * (by - cy) - (bx - cx) * (ay - cy);
+}
+function pointInTriangle(px, py, x0, y0, x1, y1, x2, y2) {
+  const d1 = triSign(px, py, x0, y0, x1, y1);
+  const d2 = triSign(px, py, x1, y1, x2, y2);
+  const d3 = triSign(px, py, x2, y2, x0, y0);
+  return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+}
+
 function hitTest(entity, mx, my) {
   const p = entity.params;
-  const pad = 8;
+  const pad = 6;
   switch (entity.type) {
     case ENTITY_TYPES.CIRCLE:
       return Math.hypot(mx - p.cx, my - p.cy) <= p.radius + pad;
-    case ENTITY_TYPES.LINE:
-      // rough AABB
-      return (
-        mx >= Math.min(p.x0, p.x1) - pad &&
-        mx <= Math.max(p.x0, p.x1) + pad &&
-        my >= Math.min(p.y0, p.y1) - pad &&
-        my <= Math.max(p.y0, p.y1) + pad
+    case ENTITY_TYPES.LINE: {
+      const dx = p.x1 - p.x0,
+        dy = p.y1 - p.y0;
+      const len2 = dx * dx + dy * dy;
+      if (len2 === 0) return Math.hypot(mx - p.x0, my - p.y0) <= pad;
+      const t = Math.max(
+        0,
+        Math.min(1, ((mx - p.x0) * dx + (my - p.y0) * dy) / len2),
       );
+      return Math.hypot(mx - (p.x0 + t * dx), my - (p.y0 + t * dy)) <= pad;
+    }
+    case ENTITY_TYPES.TRIANGLE:
+      // exact test + fallback to padded bbox for edge clicks
+      return (
+        pointInTriangle(mx, my, p.x0, p.y0, p.x1, p.y1, p.x2, p.y2) ||
+        (mx >= Math.min(p.x0, p.x1, p.x2) - pad &&
+          mx <= Math.max(p.x0, p.x1, p.x2) + pad &&
+          my >= Math.min(p.y0, p.y1, p.y2) - pad &&
+          my <= Math.max(p.y0, p.y1, p.y2) + pad)
+      );
+    case ENTITY_TYPES.PIXEL:
+      return Math.hypot(mx - p.x, my - p.y) <= pad + 2;
     default: {
       const ex = p.x ?? p.cx ?? 0;
       const ey = p.y ?? p.cy ?? 0;
       const ew = p.width ?? (p.radius ? p.radius * 2 : 60);
       const eh = p.height ?? (p.radius ? p.radius * 2 : 30);
-      return mx >= ex - pad && mx <= ex + ew + pad && my >= ey - pad && my <= ey + eh + pad;
+      return (
+        mx >= ex - pad &&
+        mx <= ex + ew + pad &&
+        my >= ey - pad &&
+        my <= ey + eh + pad
+      );
     }
   }
 }
 
+function hitHandle(handle, mx, my) {
+  const half = HANDLE_SIZE / 2 + 3;
+  return Math.abs(mx - handle.x) <= half && Math.abs(my - handle.y) <= half;
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────
+const HANDLE_CURSORS = {
+  tl: "nwse-resize",
+  br: "nwse-resize",
+  tr: "nesw-resize",
+  bl: "nesw-resize",
+  tm: "ns-resize",
+  bm: "ns-resize",
+  ml: "ew-resize",
+  mr: "ew-resize",
+  r: "ew-resize",
+  l: "ew-resize",
+  t: "ns-resize",
+  b: "ns-resize",
+  p0: "move",
+  p1: "move",
+  v0: "move",
+  v1: "move",
+  v2: "move",
+};
+
 export default function Canvas() {
   const canvasRef = useRef(null);
+  // { mode:"move"|"resize", id, handleId?, lastX, lastY, accumX, accumY }
   const dragRef = useRef(null);
-  const { display, entities, selectedEntityId, selectEntity, moveEntity } = useApp();
+  const {
+    display,
+    entities,
+    selectedEntityId,
+    selectEntity,
+    moveEntity,
+    updateEntity,
+  } = useApp();
 
-  // Scale the display to fit inside a max viewport
-  const MAX_W = window.innerWidth - 400; // sidebar + panel
+  const MAX_W = window.innerWidth - 400;
   const MAX_H = window.innerHeight - 80;
   const scale = Math.min(MAX_W / display.width, MAX_H / display.height, 1);
   const cw = display.width;
   const ch = display.height;
 
-  // ── Draw ────────────────────────────────────────────────────────────────
+  // ── Draw ──────────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-
-    // Background (e-ink white)
     ctx.fillStyle = "#f0efeb";
     ctx.fillRect(0, 0, cw, ch);
-
     entities.forEach((entity) => {
       renderEntity(ctx, entity);
-      if (entity.id === selectedEntityId) renderSelectionHandle(ctx, entity);
+      if (entity.id === selectedEntityId)
+        renderSelectionAndHandles(ctx, entity);
     });
   }, [entities, selectedEntityId, cw, ch]);
 
@@ -189,8 +361,8 @@ export default function Canvas() {
     draw();
   }, [draw]);
 
-  // ── Pointer events ────────────────────────────────────────────────────
-  const toCanvasCoords = (e) => {
+  // ── Pointer helpers ────────────────────────────────────────────────────────
+  const toCanvas = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
     return {
       x: (e.clientX - rect.left) / scale,
@@ -199,27 +371,91 @@ export default function Canvas() {
   };
 
   const handlePointerDown = (e) => {
-    const { x, y } = toCanvasCoords(e);
-    // Hit-test in reverse order (top entity first)
+    const { x, y } = toCanvas(e);
+
+    // 1. Handles of selected entity take priority
+    if (selectedEntityId) {
+      const sel = entities.find((en) => en.id === selectedEntityId);
+      if (sel) {
+        for (const h of getHandles(sel)) {
+          if (hitHandle(h, x, y)) {
+            dragRef.current = {
+              mode: "resize",
+              id: sel.id,
+              handleId: h.id,
+              lastX: x,
+              lastY: y,
+              accumX: 0,
+              accumY: 0,
+            };
+            canvasRef.current.setPointerCapture(e.pointerId);
+            return;
+          }
+        }
+      }
+    }
+
+    // 2. Entity body
     for (let i = entities.length - 1; i >= 0; i--) {
       if (hitTest(entities[i], x, y)) {
         selectEntity(entities[i].id);
-        dragRef.current = { id: entities[i].id, startX: x, startY: y };
+        dragRef.current = {
+          mode: "move",
+          id: entities[i].id,
+          lastX: x,
+          lastY: y,
+          accumX: 0,
+          accumY: 0,
+        };
         canvasRef.current.setPointerCapture(e.pointerId);
         return;
       }
     }
+
     selectEntity(null);
   };
 
   const handlePointerMove = (e) => {
-    if (!dragRef.current) return;
-    const { x, y } = toCanvasCoords(e);
-    const dx = x - dragRef.current.startX;
-    const dy = y - dragRef.current.startY;
-    moveEntity(dragRef.current.id, dx, dy);
-    dragRef.current.startX = x;
-    dragRef.current.startY = y;
+    const { x, y } = toCanvas(e);
+    const dr = dragRef.current;
+
+    // Update cursor even when not dragging
+    if (!dr) {
+      if (selectedEntityId) {
+        const sel = entities.find((en) => en.id === selectedEntityId);
+        if (sel) {
+          for (const h of getHandles(sel)) {
+            if (hitHandle(h, x, y)) {
+              canvasRef.current.style.cursor =
+                HANDLE_CURSORS[h.id] ?? "crosshair";
+              return;
+            }
+          }
+        }
+      }
+      canvasRef.current.style.cursor = "crosshair";
+      return;
+    }
+
+    // Sub-pixel accumulator → integer deltas
+    dr.accumX += x - dr.lastX;
+    dr.accumY += y - dr.lastY;
+    dr.lastX = x;
+    dr.lastY = y;
+
+    const dx = Math.round(dr.accumX);
+    const dy = Math.round(dr.accumY);
+    if (dx === 0 && dy === 0) return;
+    dr.accumX -= dx;
+    dr.accumY -= dy;
+
+    if (dr.mode === "move") {
+      moveEntity(dr.id, dx, dy);
+    } else {
+      const entity = entities.find((en) => en.id === dr.id);
+      if (entity)
+        updateEntity(dr.id, applyHandleDrag(entity, dr.handleId, dx, dy));
+    }
   };
 
   const handlePointerUp = () => {
@@ -228,14 +464,14 @@ export default function Canvas() {
 
   return (
     <div className="flex-1 bg-gray-400 flex items-center justify-center overflow-hidden">
-      {/* e-ink display frame */}
       <div
         className="relative shadow-2xl"
         style={{
           padding: "24px",
           background: "linear-gradient(145deg, #888, #666)",
           borderRadius: "8px",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.1)",
+          boxShadow:
+            "0 8px 32px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.1)",
         }}
       >
         <canvas
@@ -246,7 +482,6 @@ export default function Canvas() {
             display: "block",
             width: cw * scale,
             height: ch * scale,
-            cursor: "crosshair",
             imageRendering: "pixelated",
           }}
           onPointerDown={handlePointerDown}

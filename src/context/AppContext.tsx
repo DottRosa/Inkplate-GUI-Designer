@@ -149,11 +149,15 @@ export function AppProvider({ children }) {
     setEntities((prev) =>
       prev.map((e) => {
         if (e.id !== id) return e;
-        const p = e.params;
+        const p = e.params as any;
         if ("x" in p && "y" in p)
           return { ...e, params: { ...p, x: p.x + dx, y: p.y + dy } };
         if ("cx" in p && "cy" in p)
           return { ...e, params: { ...p, cx: p.cx + dx, cy: p.cy + dy } };
+        if (e.type === ENTITY_TYPES.TRIANGLE)
+          return { ...e, params: { ...p, x0: p.x0 + dx, y0: p.y0 + dy, x1: p.x1 + dx, y1: p.y1 + dy, x2: p.x2 + dx, y2: p.y2 + dy } };
+        if (e.type === ENTITY_TYPES.LINE)
+          return { ...e, params: { ...p, x0: p.x0 + dx, y0: p.y0 + dy, x1: p.x1 + dx, y1: p.y1 + dy } };
         return e;
       }),
     );
