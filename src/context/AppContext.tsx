@@ -100,7 +100,7 @@ export function AppProvider({ children }) {
   const [toolParams, setToolParams] = useState<Record<string, any>>(
     DEFAULT_PARAMS[ENTITY_TYPES.CIRCLE],
   );
-  const [magnetClipping, setMagnetClipping] = useState(false);
+  const [grid, setGrid] = useState({ enabled: false, size: 10 });
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const display = DISPLAYS[selectedDisplay];
@@ -293,8 +293,8 @@ export function AppProvider({ children }) {
         toolParams,
         updateToolParam,
         // Settings
-        magnetClipping,
-        setMagnetClipping,
+        grid,
+        setGrid,
         // Actions
         saveProject,
         loadProject,

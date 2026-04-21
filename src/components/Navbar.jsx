@@ -4,8 +4,8 @@ export default function Navbar() {
   const {
     selectedDisplay,
     setSelectedDisplay,
-    magnetClipping,
-    setMagnetClipping,
+    grid,
+    setGrid,
     saveProject,
     loadProject,
     exportArduino,
@@ -60,16 +60,24 @@ export default function Navbar() {
 
         <span className="text-gray-600 font-mono mx-1">|</span>
 
-        {/* Magnet clipping toggle */}
         <label className="flex items-center gap-1.5 cursor-pointer select-none">
           <input
             type="checkbox"
-            checked={magnetClipping}
-            onChange={(e) => setMagnetClipping(e.target.checked)}
+            checked={grid.enabled}
+            onChange={(e) => setGrid((g) => ({ ...g, enabled: e.target.checked }))}
             className="w-3 h-3 accent-yellow-400"
           />
-          <span className="text-sm font-mono text-white">Magnet clipping</span>
+          <span className="text-sm font-mono text-white">Grid</span>
         </label>
+        <input
+          type="number"
+          min={10}
+          max={50}
+          value={grid.size}
+          onChange={(e) => setGrid((g) => ({ ...g, size: Math.max(10, parseInt(e.target.value) || 10) }))}
+          className="w-12 text-sm font-mono px-1 py-0.5 rounded border border-gray-500 bg-gray-700 text-white text-center"
+        />
+        <span className="text-xs font-mono text-gray-400">px</span>
 
         <span className="text-gray-600 font-mono mx-1">|</span>
 

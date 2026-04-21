@@ -353,6 +353,7 @@ export default function Canvas() {
     selectEntity,
     moveEntity,
     updateEntity,
+    grid,
   } = useApp();
 
   const MAX_W = window.innerWidth - 400;
@@ -368,12 +369,20 @@ export default function Canvas() {
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = "#f0efeb";
     ctx.fillRect(0, 0, cw, ch);
+    if (grid.enabled) {
+      ctx.strokeStyle = "rgba(0,0,0,0.12)";
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      for (let gx = 0; gx <= cw; gx += grid.size) { ctx.moveTo(gx, 0); ctx.lineTo(gx, ch); }
+      for (let gy = 0; gy <= ch; gy += grid.size) { ctx.moveTo(0, gy); ctx.lineTo(cw, gy); }
+      ctx.stroke();
+    }
     entities.forEach((entity) => {
       renderEntity(ctx, entity);
       if (entity.id === selectedEntityId)
         renderSelectionAndHandles(ctx, entity);
     });
-  }, [entities, selectedEntityId, cw, ch]);
+  }, [entities, selectedEntityId, cw, ch, grid]);
 
   useEffect(() => {
     draw();
@@ -403,6 +412,12 @@ export default function Canvas() {
               handleId: h.id,
               lastX: x,
               lastY: y,
+              startX: x,
+              startY: y,
+              startHandleX: h.x,
+              startHandleY: h.y,
+              appliedDx: 0,
+              appliedDy: 0,
               accumX: 0,
               accumY: 0,
             };
@@ -417,13 +432,18 @@ export default function Canvas() {
     for (let i = entities.length - 1; i >= 0; i--) {
       if (hitTest(entities[i], x, y)) {
         selectEntity(entities[i].id);
+        const ep = entities[i].params;
         dragRef.current = {
           mode: "move",
           id: entities[i].id,
           lastX: x,
           lastY: y,
+          startX: x,
+          startY: y,
           accumX: 0,
           accumY: 0,
+          anchorX: ep.x ?? ep.cx ?? ep.x0 ?? 0,
+          anchorY: ep.y ?? ep.cy ?? ep.y0 ?? 0,
         };
         canvasRef.current.setPointerCapture(e.pointerId);
         return;
@@ -468,11 +488,40 @@ export default function Canvas() {
     dr.accumY -= dy;
 
     if (dr.mode === "move") {
-      moveEntity(dr.id, dx, dy);
+      if (grid.enabled) {
+        const snap = grid.size;
+        const totalDx = x - dr.startX;
+        const totalDy = y - dr.startY;
+        const snappedX = Math.round((dr.anchorX + totalDx) / snap) * snap;
+        const snappedY = Math.round((dr.anchorY + totalDy) / snap) * snap;
+        const entity = entities.find((en) => en.id === dr.id);
+        if (!entity) return;
+        const ep = entity.params;
+        const curX = ep.x ?? ep.cx ?? ep.x0 ?? 0;
+        const curY = ep.y ?? ep.cy ?? ep.y0 ?? 0;
+        const sdx = snappedX - curX;
+        const sdy = snappedY - curY;
+        if (sdx !== 0 || sdy !== 0) moveEntity(dr.id, sdx, sdy);
+      } else {
+        moveEntity(dr.id, dx, dy);
+      }
     } else {
       const entity = entities.find((en) => en.id === dr.id);
-      if (entity)
+      if (!entity) return;
+      if (grid.enabled) {
+        const snap = grid.size;
+        const snappedDx = Math.round((dr.startHandleX + x - dr.startX) / snap) * snap - dr.startHandleX;
+        const snappedDy = Math.round((dr.startHandleY + y - dr.startY) / snap) * snap - dr.startHandleY;
+        const ddx = snappedDx - dr.appliedDx;
+        const ddy = snappedDy - dr.appliedDy;
+        if (ddx !== 0 || ddy !== 0) {
+          dr.appliedDx = snappedDx;
+          dr.appliedDy = snappedDy;
+          updateEntity(dr.id, applyHandleDrag(entity, dr.handleId, ddx, ddy));
+        }
+      } else {
         updateEntity(dr.id, applyHandleDrag(entity, dr.handleId, dx, dy));
+      }
     }
   };
 
