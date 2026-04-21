@@ -1,4 +1,4 @@
-import { useApp, ENTITY_TYPES } from "../context/AppContext";
+import { useApp, ENTITY_TYPES, COLOR_MODES } from "../context/AppContext";
 
 // ─── Small reusable form controls ─────────────────────────────────────────
 function Field({ label, children }) {
@@ -35,20 +35,30 @@ function TextInput({ value, onChange }) {
 }
 
 function ColorSlider({ value, onChange }) {
+  const { display } = useApp();
+  const palette = COLOR_MODES[display?.colorMode ?? "3bit"] ?? COLOR_MODES["3bit"];
+  const selected = Math.max(0, Math.min(value ?? 0, palette.length - 1));
   return (
-    <div className="flex flex-col gap-1">
-      <input
-        type="range"
-        min={0}
-        max={2}
-        step={1}
-        value={value ?? 0}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-violet-600"
-      />
-      <span className="text-xs font-mono text-gray-500">
-        {value === 0 ? "Black (0)" : value === 1 ? "Dark gray (1)" : "White (2)"}
-      </span>
+    <div className="flex flex-col gap-1.5">
+      <div className="flex gap-1 flex-wrap">
+        {palette.map((c, i) => (
+          <button
+            key={i}
+            title={c.label}
+            onClick={() => onChange(i)}
+            style={{
+              width: 20,
+              height: 20,
+              background: c.css,
+              border: selected === i ? "2px solid #7c3aed" : "1px solid #999",
+              borderRadius: 3,
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          />
+        ))}
+      </div>
+      <span className="text-xs font-mono text-gray-500">{palette[selected]?.label}</span>
     </div>
   );
 }

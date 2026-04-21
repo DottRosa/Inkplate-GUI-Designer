@@ -1,20 +1,54 @@
 import { createContext, useContext, useState, useCallback } from "react";
 
+// ─── Color modes ───────────────────────────────────────────────────────────
+export const COLOR_MODES: Record<string, { label: string; css: string }[]> = {
+  "1bit": [
+    { label: "Black", css: "#000000" },
+    { label: "White", css: "#ffffff" },
+  ],
+  "3bit": Array.from({ length: 8 }, (_, i) => ({
+    label: i === 0 ? "Black" : i === 7 ? "White" : `Gray ${i}`,
+    css: `rgb(${Math.round((i / 7) * 255)},${Math.round((i / 7) * 255)},${Math.round((i / 7) * 255)})`,
+  })),
+  "bwr": [
+    { label: "Black", css: "#000000" },
+    { label: "White", css: "#ffffff" },
+    { label: "Red",   css: "#cc0000" },
+  ],
+  "7color": [
+    { label: "Black",  css: "#000000" },
+    { label: "White",  css: "#ffffff" },
+    { label: "Green",  css: "#007800" },
+    { label: "Blue",   css: "#0000c8" },
+    { label: "Red",    css: "#c80000" },
+    { label: "Yellow", css: "#f0e000" },
+    { label: "Orange", css: "#c87800" },
+  ],
+  "6color": [
+    { label: "Black",  css: "#000000" },
+    { label: "White",  css: "#ffffff" },
+    { label: "Yellow", css: "#f0e000" },
+    { label: "Red",    css: "#c80000" },
+    { label: "Blue",   css: "#0000c8" },
+    { label: "Green",  css: "#007800" },
+  ],
+};
+
 // ─── Display configurations ────────────────────────────────────────────────
 export const DISPLAYS = {
-  inkplate2:        { label: "Inkplate 2",        width: 212,  height: 104  },
-  inkplate4:        { label: "Inkplate 4",        width: 400,  height: 300  },
-  inkplate4tempera: { label: "Inkplate 4TEMPERA", width: 600,  height: 600  },
-  inkplate5:        { label: "Inkplate 5",        width: 960,  height: 540  },
-  inkplate5v2:      { label: "Inkplate 5V2",      width: 1280, height: 720  },
-  inkplate6:        { label: "Inkplate 6",        width: 800,  height: 600  },
-  inkplate6color:   { label: "Inkplate 6COLOR",   width: 600,  height: 448  },
-  inkplate6flick:   { label: "Inkplate 6FLICK",   width: 1024, height: 758  },
-  inkplate6motion:  { label: "Inkplate 6MOTION",  width: 1024, height: 758  },
-  inkplate6plus:    { label: "Inkplate 6PLUS",    width: 1024, height: 758  },
-  inkplate7:        { label: "Inkplate 7",        width: 640,  height: 384  },
-  inkplate10:       { label: "Inkplate 10",       width: 1200, height: 825  },
-  inkplate13spectra:{ label: "Inkplate 13SPECTRA",width: 1600, height: 1200 },
+  inkplate2:         { label: "Inkplate 2",        width: 212,  height: 104,  colorMode: "bwr"    },
+  inkplate4:         { label: "Inkplate 4",        width: 400,  height: 300,  colorMode: "bwr"    },
+  inkplate4tempera:  { label: "Inkplate 4TEMPERA", width: 600,  height: 600,  colorMode: "3bit"   },
+  inkplate5:         { label: "Inkplate 5",        width: 960,  height: 540,  colorMode: "3bit"   },
+  inkplate5v2:       { label: "Inkplate 5V2",      width: 1280, height: 720,  colorMode: "3bit"   },
+  inkplate6:         { label: "Inkplate 6",        width: 800,  height: 600,  colorMode: "3bit"   },
+  inkplate6color:    { label: "Inkplate 6COLOR",   width: 600,  height: 448,  colorMode: "7color" },
+  inkplate6flick:    { label: "Inkplate 6FLICK",   width: 1024, height: 758,  colorMode: "3bit"   },
+  inkplate6motion:   { label: "Inkplate 6MOTION",  width: 1024, height: 758,  colorMode: "3bit"   },
+  inkplate6plus:     { label: "Inkplate 6PLUS",    width: 1024, height: 758,  colorMode: "3bit"   },
+  inkplate7:         { label: "Inkplate 7",        width: 640,  height: 384,  colorMode: "bwr"    },
+  inkplate10:        { label: "Inkplate 10",       width: 1200, height: 825,  colorMode: "3bit"   },
+  inkplate13spectra: { label: "Inkplate 13SPECTRA",width: 1600, height: 1200, colorMode: "6color" },
 };
 
 // ─── Entity type definitions ───────────────────────────────────────────────

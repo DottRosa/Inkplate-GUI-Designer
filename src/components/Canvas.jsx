@@ -1,7 +1,12 @@
 import { useRef, useEffect, useCallback, useState } from "react";
-import { useApp, ENTITY_TYPES } from "../context/AppContext";
+import { useApp, ENTITY_TYPES, COLOR_MODES } from "../context/AppContext";
 
 const HANDLE_SIZE = 8; // canvas px
+
+function colorToCSS(color, colorMode) {
+  const palette = COLOR_MODES[colorMode] ?? COLOR_MODES["3bit"];
+  return palette[Math.max(0, Math.min(color ?? 0, palette.length - 1))].css;
+}
 
 // ─── Resize handles ────────────────────────────────────────────────────────
 function getHandles(entity) {
@@ -106,10 +111,11 @@ function applyHandleDrag(entity, handleId, dx, dy) {
 }
 
 // ─── Canvas rendering ──────────────────────────────────────────────────────
-function renderEntity(ctx, entity) {
+function renderEntity(ctx, entity, colorMode) {
   const p = entity.params;
-  ctx.strokeStyle = p.color === 0 ? "#000" : "#fff";
-  ctx.fillStyle = p.color === 0 ? "#000" : "#fff";
+  const c = colorToCSS(p.color, colorMode);
+  ctx.strokeStyle = c;
+  ctx.fillStyle = c;
   ctx.lineWidth = p.thickness ?? 1;
 
   switch (entity.type) {
@@ -146,7 +152,6 @@ function renderEntity(ctx, entity) {
       const boxW = p.width ?? 200;
       const boxH = p.height ?? 60;
       ctx.font = `${size}px "Courier New", monospace`;
-      ctx.fillStyle = p.color === 0 ? "#000" : "#fff";
       const words = (p.text ?? "").split(" ");
       const lines = [];
       let cur = words[0] ?? "";
@@ -176,31 +181,23 @@ function renderEntity(ctx, entity) {
     case ENTITY_TYPES.CLOCK: {
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-      ctx.strokeStyle = p.color === 0 ? "#000" : "#fff";
       ctx.stroke();
       const now = new Date();
       const hAng = ((now.getHours() % 12) / 12) * Math.PI * 2 - Math.PI / 2;
       const mAng = (now.getMinutes() / 60) * Math.PI * 2 - Math.PI / 2;
       ctx.beginPath();
       ctx.moveTo(p.x, p.y);
-      ctx.lineTo(
-        p.x + Math.cos(hAng) * p.radius * 0.5,
-        p.y + Math.sin(hAng) * p.radius * 0.5,
-      );
+      ctx.lineTo(p.x + Math.cos(hAng) * p.radius * 0.5, p.y + Math.sin(hAng) * p.radius * 0.5);
       ctx.stroke();
       ctx.beginPath();
       ctx.moveTo(p.x, p.y);
-      ctx.lineTo(
-        p.x + Math.cos(mAng) * p.radius * 0.7,
-        p.y + Math.sin(mAng) * p.radius * 0.7,
-      );
+      ctx.lineTo(p.x + Math.cos(mAng) * p.radius * 0.7, p.y + Math.sin(mAng) * p.radius * 0.7);
       ctx.stroke();
       break;
     }
     case ENTITY_TYPES.DIGITAL_CLOCK: {
       const size = (p.fontSize ?? 3) * 8;
       ctx.font = `${size}px "Courier New", monospace`;
-      ctx.fillStyle = p.color === 0 ? "#000" : "#fff";
       ctx.fillText(new Date().toLocaleTimeString(), p.x, p.y + size);
       break;
     }
@@ -394,12 +391,13 @@ export default function Canvas() {
       for (let gy = 0; gy <= ch; gy += grid.size) { ctx.moveTo(0, gy); ctx.lineTo(cw, gy); }
       ctx.stroke();
     }
+    const colorMode = display.colorMode ?? "3bit";
     entities.forEach((entity) => {
-      renderEntity(ctx, entity);
+      renderEntity(ctx, entity, colorMode);
       if (entity.id === selectedEntityId)
         renderSelectionAndHandles(ctx, entity);
     });
-  }, [entities, selectedEntityId, cw, ch, grid]);
+  }, [entities, selectedEntityId, cw, ch, grid, display]);
 
   useEffect(() => {
     draw();
