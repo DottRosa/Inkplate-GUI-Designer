@@ -63,6 +63,8 @@ export const DEFAULT_PARAMS = {
   [ENTITY_TYPES.TEXT]: {
     x: 100,
     y: 100,
+    width: 200,
+    height: 100,
     text: "Hello!",
     fontSize: 2,
     color: 0,
@@ -92,14 +94,7 @@ const generateId = (type) => {
 
 export function AppProvider({ children }) {
   const [selectedDisplay, setSelectedDisplay] = useState("inkplate6");
-  const [entities, setEntities] = useState<Entity[]>([
-    {
-      id: "Text0",
-      name: "Text0",
-      type: ENTITY_TYPES.TEXT,
-      params: { x: 200, y: 280, text: "Hello there!", fontSize: 5, color: 0 },
-    },
-  ]);
+  const [entities, setEntities] = useState<Entity[]>([]);
   const [selectedEntityId, setSelectedEntityId] = useState(null);
   const [activeTool, setActiveTool] = useState(ENTITY_TYPES.CIRCLE);
   const [toolParams, setToolParams] = useState<Record<string, any>>(

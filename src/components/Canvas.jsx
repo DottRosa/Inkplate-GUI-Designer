@@ -17,6 +17,7 @@ function getHandles(entity) {
     case ENTITY_TYPES.RECTANGLE:
     case ENTITY_TYPES.BITMAP:
     case ENTITY_TYPES.GRAPH:
+    case ENTITY_TYPES.TEXT:
       return [
         { id: "tl", x: p.x, y: p.y },
         { id: "tr", x: p.x + p.width, y: p.y },
@@ -60,6 +61,7 @@ function applyHandleDrag(entity, handleId, dx, dy) {
     case ENTITY_TYPES.RECTANGLE:
     case ENTITY_TYPES.BITMAP:
     case ENTITY_TYPES.GRAPH:
+    case ENTITY_TYPES.TEXT:
       if (handleId.includes("l")) {
         p.width = Math.max(1, ri(p.width - dx));
         p.x = ri(p.x + dx);
@@ -141,9 +143,25 @@ function renderEntity(ctx, entity) {
       break;
     case ENTITY_TYPES.TEXT: {
       const size = (p.fontSize ?? 2) * 8;
+      const boxW = p.width ?? 200;
+      const boxH = p.height ?? 60;
       ctx.font = `${size}px "Courier New", monospace`;
       ctx.fillStyle = p.color === 0 ? "#000" : "#fff";
-      ctx.fillText(p.text ?? "", p.x, p.y + size);
+      const words = (p.text ?? "").split(" ");
+      const lines = [];
+      let cur = words[0] ?? "";
+      for (let i = 1; i < words.length; i++) {
+        const test = cur + " " + words[i];
+        if (ctx.measureText(test).width <= boxW) cur = test;
+        else { lines.push(cur); cur = words[i]; }
+      }
+      if (cur) lines.push(cur);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(p.x, p.y, boxW, boxH);
+      ctx.clip();
+      lines.forEach((line, i) => ctx.fillText(line, p.x, p.y + size + i * size));
+      ctx.restore();
       break;
     }
     case ENTITY_TYPES.GRAPH:

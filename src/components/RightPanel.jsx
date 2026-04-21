@@ -136,6 +136,8 @@ function TextForm({ p, set }) {
     <>
       <Field label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></Field>
       <Field label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></Field>
+      <Field label="Width"><NumberInput value={p.width} min={10} onChange={(v) => set("width", v)} /></Field>
+      <Field label="Height"><NumberInput value={p.height} min={10} onChange={(v) => set("height", v)} /></Field>
       <Field label="Text"><TextInput value={p.text} onChange={(v) => set("text", v)} /></Field>
       <Field label="Font size"><NumberInput value={p.fontSize} min={1} max={10} onChange={(v) => set("fontSize", v)} /></Field>
       <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
