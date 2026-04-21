@@ -2,10 +2,19 @@ import { createContext, useContext, useState, useCallback } from "react";
 
 // ─── Display configurations ────────────────────────────────────────────────
 export const DISPLAYS = {
-  inkplate6: { label: "Inkplate 6", width: 800, height: 600 },
-  inkplate10: { label: "Inkplate 10", width: 1200, height: 825 },
-  inkplate6plus: { label: "Inkplate 6PLUS", width: 1024, height: 758 },
-  inkplate2: { label: "Inkplate 2", width: 212, height: 104 },
+  inkplate2:        { label: "Inkplate 2",        width: 212,  height: 104  },
+  inkplate4:        { label: "Inkplate 4",        width: 400,  height: 300  },
+  inkplate4tempera: { label: "Inkplate 4TEMPERA", width: 600,  height: 600  },
+  inkplate5:        { label: "Inkplate 5",        width: 960,  height: 540  },
+  inkplate5v2:      { label: "Inkplate 5V2",      width: 1280, height: 720  },
+  inkplate6:        { label: "Inkplate 6",        width: 800,  height: 600  },
+  inkplate6color:   { label: "Inkplate 6COLOR",   width: 600,  height: 448  },
+  inkplate6flick:   { label: "Inkplate 6FLICK",   width: 1024, height: 758  },
+  inkplate6motion:  { label: "Inkplate 6MOTION",  width: 1024, height: 758  },
+  inkplate6plus:    { label: "Inkplate 6PLUS",    width: 1024, height: 758  },
+  inkplate7:        { label: "Inkplate 7",        width: 640,  height: 384  },
+  inkplate10:       { label: "Inkplate 10",       width: 1200, height: 825  },
+  inkplate13spectra:{ label: "Inkplate 13SPECTRA",width: 1600, height: 1200 },
 };
 
 // ─── Entity type definitions ───────────────────────────────────────────────
@@ -75,6 +84,39 @@ export const DEFAULT_PARAMS = {
   [ENTITY_TYPES.DIGITAL_CLOCK]: { x: 100, y: 100, fontSize: 3, color: 0 },
 };
 
+// ─── Centering helper ──────────────────────────────────────────────────────
+function centerParams(type: string, params: Record<string, any>, display: { width: number; height: number }): Record<string, any> {
+  const cx = Math.round(display.width / 2);
+  const cy = Math.round(display.height / 2);
+  const p = { ...params };
+  switch (type) {
+    case ENTITY_TYPES.PIXEL:
+      return { ...p, x: cx, y: cy };
+    case ENTITY_TYPES.LINE: {
+      const hdx = Math.round((p.x1 - p.x0) / 2);
+      const hdy = Math.round((p.y1 - p.y0) / 2);
+      return { ...p, x0: cx - hdx, y0: cy - hdy, x1: cx + hdx, y1: cy + hdy };
+    }
+    case ENTITY_TYPES.RECTANGLE:
+    case ENTITY_TYPES.BITMAP:
+    case ENTITY_TYPES.GRAPH:
+    case ENTITY_TYPES.TEXT:
+      return { ...p, x: Math.round(cx - p.width / 2), y: Math.round(cy - p.height / 2) };
+    case ENTITY_TYPES.CIRCLE:
+    case ENTITY_TYPES.CLOCK:
+      return { ...p, cx, cy };
+    case ENTITY_TYPES.TRIANGLE: {
+      const tcx = Math.round((p.x0 + p.x1 + p.x2) / 3);
+      const tcy = Math.round((p.y0 + p.y1 + p.y2) / 3);
+      return { ...p, x0: p.x0 + cx - tcx, y0: p.y0 + cy - tcy, x1: p.x1 + cx - tcx, y1: p.y1 + cy - tcy, x2: p.x2 + cx - tcx, y2: p.y2 + cy - tcy };
+    }
+    case ENTITY_TYPES.DIGITAL_CLOCK:
+      return { ...p, x: cx, y: cy };
+    default:
+      return p;
+  }
+}
+
 // ─── Types ─────────────────────────────────────────────────────────────────
 export interface Entity {
   id: string;
@@ -103,7 +145,7 @@ export function AppProvider({ children }) {
   const [grid, setGrid] = useState({ enabled: false, size: 10 });
 
   // ── Derived ──────────────────────────────────────────────────────────────
-  const display = DISPLAYS[selectedDisplay];
+  const display = DISPLAYS[selectedDisplay as keyof typeof DISPLAYS];
   const selectedEntity =
     entities.find((e) => e.id === selectedEntityId) ?? null;
 
@@ -121,11 +163,12 @@ export function AppProvider({ children }) {
   // ── Entity CRUD ──────────────────────────────────────────────────────────
   const createEntity = useCallback(() => {
     const id = generateId(activeTool);
-    const newEntity = { id, name: id, type: activeTool, params: { ...toolParams } };
+    const centered = centerParams(activeTool, toolParams, display);
+    const newEntity = { id, name: id, type: activeTool, params: centered };
     setEntities((prev) => [...prev, newEntity]);
     setSelectedEntityId(id);
     return id;
-  }, [activeTool, toolParams]);
+  }, [activeTool, toolParams, display]);
 
   const renameEntity = useCallback((id: string, newName: string) => {
     setEntities((prev) =>

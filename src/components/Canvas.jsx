@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import { useApp, ENTITY_TYPES } from "../context/AppContext";
 
 const HANDLE_SIZE = 8; // canvas px
@@ -356,11 +356,28 @@ export default function Canvas() {
     grid,
   } = useApp();
 
-  const MAX_W = window.innerWidth - 400;
-  const MAX_H = window.innerHeight - 80;
-  const scale = Math.min(MAX_W / display.width, MAX_H / display.height, 1);
+  const FRAME_PAD = 48; // 24px padding each side of device frame
+  const PANEL_W = 400;
+  const NAVBAR_H = 80;
+  const V_MARGIN = 48; // breathing room top/bottom
+
+  const [viewport, setViewport] = useState({
+    w: window.innerWidth - PANEL_W - FRAME_PAD,
+    h: window.innerHeight - NAVBAR_H - FRAME_PAD - V_MARGIN,
+  });
+
+  useEffect(() => {
+    const onResize = () => setViewport({
+      w: window.innerWidth - PANEL_W - FRAME_PAD,
+      h: window.innerHeight - NAVBAR_H - FRAME_PAD - V_MARGIN,
+    });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   const cw = display.width;
   const ch = display.height;
+  const scale = Math.min(viewport.w / cw, viewport.h / ch);
 
   // ── Draw ──────────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
@@ -531,30 +548,35 @@ export default function Canvas() {
 
   return (
     <div className="flex-1 bg-gray-400 flex items-center justify-center overflow-hidden">
-      <div
-        className="relative shadow-2xl"
-        style={{
-          padding: "24px",
-          background: "linear-gradient(145deg, #888, #666)",
-          borderRadius: "8px",
-          boxShadow:
-            "0 8px 32px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.1)",
-        }}
-      >
-        <canvas
-          ref={canvasRef}
-          width={cw}
-          height={ch}
+      <div className="flex flex-col items-center gap-2">
+        <div
+          className="relative shadow-2xl"
           style={{
-            display: "block",
-            width: cw * scale,
-            height: ch * scale,
-            imageRendering: "pixelated",
+            padding: "24px",
+            background: "linear-gradient(145deg, #888, #666)",
+            borderRadius: "8px",
+            boxShadow:
+              "0 8px 32px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.1)",
           }}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-        />
+        >
+          <canvas
+            ref={canvasRef}
+            width={cw}
+            height={ch}
+            style={{
+              display: "block",
+              width: cw * scale,
+              height: ch * scale,
+              imageRendering: "pixelated",
+            }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+          />
+        </div>
+        <div className="text-xs font-mono text-gray-200 select-none">
+          {display.width} × {display.height} px &nbsp;·&nbsp; {Math.round(scale * 100)}%
+        </div>
       </div>
     </div>
   );
