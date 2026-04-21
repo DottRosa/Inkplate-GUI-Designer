@@ -211,6 +211,7 @@ export default function RightPanel() {
     selectedEntityId,
     selectedEntity,
     updateEntity,
+    renameEntity,
   } = useApp();
 
   // If an entity is selected, show its edit form
@@ -221,8 +222,15 @@ export default function RightPanel() {
     return (
       <aside className="w-56 bg-white border-l border-gray-200 overflow-y-auto shrink-0 px-3 py-3">
         <h2 className="font-bold text-sm font-mono text-gray-900 mb-3">
-          Edit: {selectedEntity.id}
+          Edit: {selectedEntity.name ?? selectedEntity.id}
         </h2>
+        <Field label="Name">
+          <TextInput
+            value={selectedEntity.name ?? selectedEntity.id}
+            onChange={(v) => renameEntity(selectedEntity.id, v)}
+          />
+        </Field>
+        <div className="border-t border-gray-100 my-3" />
         <Form p={selectedEntity.params} set={set} />
       </aside>
     );

@@ -73,8 +73,16 @@ export const DEFAULT_PARAMS = {
   [ENTITY_TYPES.DIGITAL_CLOCK]: { x: 100, y: 100, fontSize: 3, color: 0 },
 };
 
+// ─── Types ─────────────────────────────────────────────────────────────────
+export interface Entity {
+  id: string;
+  name: string;
+  type: string;
+  params: Record<string, any>;
+}
+
 // ─── Context ───────────────────────────────────────────────────────────────
-const AppContext = createContext(null);
+const AppContext = createContext<any>(null);
 
 let entityCounter = 0;
 const generateId = (type) => {
@@ -84,16 +92,17 @@ const generateId = (type) => {
 
 export function AppProvider({ children }) {
   const [selectedDisplay, setSelectedDisplay] = useState("inkplate6");
-  const [entities, setEntities] = useState([
+  const [entities, setEntities] = useState<Entity[]>([
     {
       id: "Text0",
+      name: "Text0",
       type: ENTITY_TYPES.TEXT,
       params: { x: 200, y: 280, text: "Hello there!", fontSize: 5, color: 0 },
     },
   ]);
   const [selectedEntityId, setSelectedEntityId] = useState(null);
   const [activeTool, setActiveTool] = useState(ENTITY_TYPES.CIRCLE);
-  const [toolParams, setToolParams] = useState(
+  const [toolParams, setToolParams] = useState<Record<string, any>>(
     DEFAULT_PARAMS[ENTITY_TYPES.CIRCLE],
   );
   const [magnetClipping, setMagnetClipping] = useState(false);
@@ -117,11 +126,17 @@ export function AppProvider({ children }) {
   // ── Entity CRUD ──────────────────────────────────────────────────────────
   const createEntity = useCallback(() => {
     const id = generateId(activeTool);
-    const newEntity = { id, type: activeTool, params: { ...toolParams } };
+    const newEntity = { id, name: id, type: activeTool, params: { ...toolParams } };
     setEntities((prev) => [...prev, newEntity]);
     setSelectedEntityId(id);
     return id;
   }, [activeTool, toolParams]);
+
+  const renameEntity = useCallback((id: string, newName: string) => {
+    setEntities((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, name: newName } : e)),
+    );
+  }, []);
 
   const selectEntity = useCallback(
     (id) => {
@@ -276,6 +291,7 @@ export function AppProvider({ children }) {
         updateEntity,
         deleteEntity,
         moveEntity,
+        renameEntity,
         // Tool
         activeTool,
         selectTool,

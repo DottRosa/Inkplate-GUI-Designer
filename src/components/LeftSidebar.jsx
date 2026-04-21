@@ -46,7 +46,7 @@ function EntityItem({ entity, selected, onClick, onDelete }) {
         ${selected ? "bg-violet-200 text-violet-900 font-semibold" : "text-gray-800 hover:bg-gray-100"}`}
       onClick={onClick}
     >
-      <span>{entity.id}</span>
+      <span>{entity.name ?? entity.id}</span>
       <button
         onClick={(e) => { e.stopPropagation(); onDelete(entity.id); }}
         className="hidden group-hover:block text-red-400 hover:text-red-600 text-xs px-1 leading-none"
