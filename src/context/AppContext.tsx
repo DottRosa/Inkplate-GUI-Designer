@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useRef } from "react";
 
 // ─── Color modes ───────────────────────────────────────────────────────────
 export const COLOR_MODES: Record<string, { label: string; css: string }[]> = {
@@ -171,12 +171,15 @@ const generateId = (type) => {
 export function AppProvider({ children }) {
   const [selectedDisplay, setSelectedDisplay] = useState("inkplate6");
   const [entities, setEntities] = useState<Entity[]>([]);
-  const [selectedEntityId, setSelectedEntityId] = useState(null);
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState(ENTITY_TYPES.CIRCLE);
   const [toolParams, setToolParams] = useState<Record<string, any>>(
     DEFAULT_PARAMS[ENTITY_TYPES.CIRCLE],
   );
   const [grid, setGrid] = useState({ enabled: false, size: 10 });
+
+  const entitiesRef = useRef(entities);
+  entitiesRef.current = entities;
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const display = DISPLAYS[selectedDisplay as keyof typeof DISPLAYS];
@@ -210,14 +213,11 @@ export function AppProvider({ children }) {
     );
   }, []);
 
-  const selectEntity = useCallback(
-    (id) => {
-      setSelectedEntityId(id);
-      const entity = entities.find((e) => e.id === id);
-      if (entity) setToolParams({ ...entity.params });
-    },
-    [entities],
-  );
+  const selectEntity = useCallback((id: string | null) => {
+    setSelectedEntityId(id);
+    const entity = entitiesRef.current.find((e) => e.id === id);
+    if (entity) setToolParams({ ...entity.params });
+  }, []);
 
   const updateEntity = useCallback((id, newParams) => {
     setEntities((prev) =>

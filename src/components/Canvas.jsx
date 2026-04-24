@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState } from "react";
+import { useRef, useEffect, useLayoutEffect, useCallback, useState } from "react";
 import { useApp, ENTITY_TYPES, COLOR_MODES } from "../context/AppContext";
 
 const HANDLE_SIZE = 8; // canvas px
@@ -399,7 +399,7 @@ export default function Canvas() {
     });
   }, [entities, selectedEntityId, cw, ch, grid, display]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     draw();
   }, [draw]);
 
