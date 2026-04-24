@@ -10,6 +10,19 @@ function Field({ label, children }) {
   );
 }
 
+function FieldRow({ children }) {
+  return <div className="flex gap-2 mb-3">{children}</div>;
+}
+
+function FieldCell({ label, children }) {
+  return (
+    <div className="flex-1 min-w-0">
+      <label className="block text-sm font-mono text-gray-700 mb-1">{label}</label>
+      {children}
+    </div>
+  );
+}
+
 function NumberInput({ value, onChange, min, max }) {
   return (
     <input
@@ -81,8 +94,10 @@ function CheckboxInput({ label, value, onChange }) {
 function PixelForm({ p, set }) {
   return (
     <>
-      <Field label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></Field>
-      <Field label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></Field>
+      <FieldRow>
+        <FieldCell label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></FieldCell>
+        <FieldCell label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></FieldCell>
+      </FieldRow>
       <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
     </>
   );
@@ -91,10 +106,14 @@ function PixelForm({ p, set }) {
 function LineForm({ p, set }) {
   return (
     <>
-      <Field label="X0"><NumberInput value={p.x0} onChange={(v) => set("x0", v)} /></Field>
-      <Field label="Y0"><NumberInput value={p.y0} onChange={(v) => set("y0", v)} /></Field>
-      <Field label="X1"><NumberInput value={p.x1} onChange={(v) => set("x1", v)} /></Field>
-      <Field label="Y1"><NumberInput value={p.y1} onChange={(v) => set("y1", v)} /></Field>
+      <FieldRow>
+        <FieldCell label="X0"><NumberInput value={p.x0} onChange={(v) => set("x0", v)} /></FieldCell>
+        <FieldCell label="Y0"><NumberInput value={p.y0} onChange={(v) => set("y0", v)} /></FieldCell>
+      </FieldRow>
+      <FieldRow>
+        <FieldCell label="X1"><NumberInput value={p.x1} onChange={(v) => set("x1", v)} /></FieldCell>
+        <FieldCell label="Y1"><NumberInput value={p.y1} onChange={(v) => set("y1", v)} /></FieldCell>
+      </FieldRow>
       <Field label="Thickness"><NumberInput value={p.thickness} min={1} onChange={(v) => set("thickness", v)} /></Field>
       <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
     </>
@@ -104,10 +123,14 @@ function LineForm({ p, set }) {
 function RectForm({ p, set }) {
   return (
     <>
-      <Field label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></Field>
-      <Field label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></Field>
-      <Field label="Width"><NumberInput value={p.width} min={1} onChange={(v) => set("width", v)} /></Field>
-      <Field label="Height"><NumberInput value={p.height} min={1} onChange={(v) => set("height", v)} /></Field>
+      <FieldRow>
+        <FieldCell label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></FieldCell>
+        <FieldCell label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></FieldCell>
+      </FieldRow>
+      <FieldRow>
+        <FieldCell label="Width"><NumberInput value={p.width} min={1} onChange={(v) => set("width", v)} /></FieldCell>
+        <FieldCell label="Height"><NumberInput value={p.height} min={1} onChange={(v) => set("height", v)} /></FieldCell>
+      </FieldRow>
       <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
       <CheckboxInput label="Fill" value={p.fill} onChange={(v) => set("fill", v)} />
     </>
@@ -117,8 +140,10 @@ function RectForm({ p, set }) {
 function CircleForm({ p, set }) {
   return (
     <>
-      <Field label="Center x"><NumberInput value={p.cx} onChange={(v) => set("cx", v)} /></Field>
-      <Field label="Center y"><NumberInput value={p.cy} onChange={(v) => set("cy", v)} /></Field>
+      <FieldRow>
+        <FieldCell label="Cx"><NumberInput value={p.cx} onChange={(v) => set("cx", v)} /></FieldCell>
+        <FieldCell label="Cy"><NumberInput value={p.cy} onChange={(v) => set("cy", v)} /></FieldCell>
+      </FieldRow>
       <Field label="Radius"><NumberInput value={p.radius} min={1} onChange={(v) => set("radius", v)} /></Field>
       <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
       <CheckboxInput label="Fill" value={p.fill} onChange={(v) => set("fill", v)} />
@@ -129,12 +154,18 @@ function CircleForm({ p, set }) {
 function TriangleForm({ p, set }) {
   return (
     <>
-      <Field label="X0"><NumberInput value={p.x0} onChange={(v) => set("x0", v)} /></Field>
-      <Field label="Y0"><NumberInput value={p.y0} onChange={(v) => set("y0", v)} /></Field>
-      <Field label="X1"><NumberInput value={p.x1} onChange={(v) => set("x1", v)} /></Field>
-      <Field label="Y1"><NumberInput value={p.y1} onChange={(v) => set("y1", v)} /></Field>
-      <Field label="X2"><NumberInput value={p.x2} onChange={(v) => set("x2", v)} /></Field>
-      <Field label="Y2"><NumberInput value={p.y2} onChange={(v) => set("y2", v)} /></Field>
+      <FieldRow>
+        <FieldCell label="X0"><NumberInput value={p.x0} onChange={(v) => set("x0", v)} /></FieldCell>
+        <FieldCell label="Y0"><NumberInput value={p.y0} onChange={(v) => set("y0", v)} /></FieldCell>
+      </FieldRow>
+      <FieldRow>
+        <FieldCell label="X1"><NumberInput value={p.x1} onChange={(v) => set("x1", v)} /></FieldCell>
+        <FieldCell label="Y1"><NumberInput value={p.y1} onChange={(v) => set("y1", v)} /></FieldCell>
+      </FieldRow>
+      <FieldRow>
+        <FieldCell label="X2"><NumberInput value={p.x2} onChange={(v) => set("x2", v)} /></FieldCell>
+        <FieldCell label="Y2"><NumberInput value={p.y2} onChange={(v) => set("y2", v)} /></FieldCell>
+      </FieldRow>
       <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
       <CheckboxInput label="Fill" value={p.fill} onChange={(v) => set("fill", v)} />
     </>
@@ -144,10 +175,14 @@ function TriangleForm({ p, set }) {
 function TextForm({ p, set }) {
   return (
     <>
-      <Field label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></Field>
-      <Field label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></Field>
-      <Field label="Width"><NumberInput value={p.width} min={10} onChange={(v) => set("width", v)} /></Field>
-      <Field label="Height"><NumberInput value={p.height} min={10} onChange={(v) => set("height", v)} /></Field>
+      <FieldRow>
+        <FieldCell label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></FieldCell>
+        <FieldCell label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></FieldCell>
+      </FieldRow>
+      <FieldRow>
+        <FieldCell label="Width"><NumberInput value={p.width} min={10} onChange={(v) => set("width", v)} /></FieldCell>
+        <FieldCell label="Height"><NumberInput value={p.height} min={10} onChange={(v) => set("height", v)} /></FieldCell>
+      </FieldRow>
       <Field label="Text"><TextInput value={p.text} onChange={(v) => set("text", v)} /></Field>
       <Field label="Font size"><NumberInput value={p.fontSize} min={1} max={10} onChange={(v) => set("fontSize", v)} /></Field>
       <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
@@ -158,10 +193,14 @@ function TextForm({ p, set }) {
 function GraphForm({ p, set }) {
   return (
     <>
-      <Field label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></Field>
-      <Field label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></Field>
-      <Field label="Width"><NumberInput value={p.width} min={20} onChange={(v) => set("width", v)} /></Field>
-      <Field label="Height"><NumberInput value={p.height} min={20} onChange={(v) => set("height", v)} /></Field>
+      <FieldRow>
+        <FieldCell label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></FieldCell>
+        <FieldCell label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></FieldCell>
+      </FieldRow>
+      <FieldRow>
+        <FieldCell label="Width"><NumberInput value={p.width} min={20} onChange={(v) => set("width", v)} /></FieldCell>
+        <FieldCell label="Height"><NumberInput value={p.height} min={20} onChange={(v) => set("height", v)} /></FieldCell>
+      </FieldRow>
       <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
     </>
   );
@@ -170,8 +209,10 @@ function GraphForm({ p, set }) {
 function ClockForm({ p, set }) {
   return (
     <>
-      <Field label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></Field>
-      <Field label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></Field>
+      <FieldRow>
+        <FieldCell label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></FieldCell>
+        <FieldCell label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></FieldCell>
+      </FieldRow>
       <Field label="Radius"><NumberInput value={p.radius} min={10} onChange={(v) => set("radius", v)} /></Field>
       <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
     </>
@@ -181,8 +222,10 @@ function ClockForm({ p, set }) {
 function DigitalClockForm({ p, set }) {
   return (
     <>
-      <Field label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></Field>
-      <Field label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></Field>
+      <FieldRow>
+        <FieldCell label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></FieldCell>
+        <FieldCell label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></FieldCell>
+      </FieldRow>
       <Field label="Font size"><NumberInput value={p.fontSize} min={1} max={10} onChange={(v) => set("fontSize", v)} /></Field>
       <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
     </>
@@ -192,10 +235,14 @@ function DigitalClockForm({ p, set }) {
 function BitmapForm({ p, set }) {
   return (
     <>
-      <Field label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></Field>
-      <Field label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></Field>
-      <Field label="Width"><NumberInput value={p.width} min={1} onChange={(v) => set("width", v)} /></Field>
-      <Field label="Height"><NumberInput value={p.height} min={1} onChange={(v) => set("height", v)} /></Field>
+      <FieldRow>
+        <FieldCell label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></FieldCell>
+        <FieldCell label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></FieldCell>
+      </FieldRow>
+      <FieldRow>
+        <FieldCell label="Width"><NumberInput value={p.width} min={1} onChange={(v) => set("width", v)} /></FieldCell>
+        <FieldCell label="Height"><NumberInput value={p.height} min={1} onChange={(v) => set("height", v)} /></FieldCell>
+      </FieldRow>
     </>
   );
 }
