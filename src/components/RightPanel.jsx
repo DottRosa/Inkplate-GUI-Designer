@@ -233,6 +233,14 @@ function DigitalClockForm({ p, set }) {
 }
 
 function BitmapForm({ p, set }) {
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => set("src", ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
   return (
     <>
       <FieldRow>
@@ -243,6 +251,19 @@ function BitmapForm({ p, set }) {
         <FieldCell label="Width"><NumberInput value={p.width} min={1} onChange={(v) => set("width", v)} /></FieldCell>
         <FieldCell label="Height"><NumberInput value={p.height} min={1} onChange={(v) => set("height", v)} /></FieldCell>
       </FieldRow>
+      <Field label="Image">
+        <label className="block w-full text-center text-sm font-mono border border-gray-300 rounded px-2 py-1.5 cursor-pointer hover:bg-gray-50 transition-colors">
+          {p.src ? "Change image" : "Upload image"}
+          <input type="file" accept="image/*" className="hidden" onChange={handleFile} />
+        </label>
+        {p.src && (
+          <img
+            src={p.src}
+            alt=""
+            className="mt-2 w-full object-contain max-h-24 rounded border border-gray-200"
+          />
+        )}
+      </Field>
     </>
   );
 }

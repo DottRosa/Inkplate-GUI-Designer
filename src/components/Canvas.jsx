@@ -110,8 +110,91 @@ function applyHandleDrag(entity, handleId, dx, dy) {
   }
 }
 
+// ─── Shift-constrained resize ─────────────────────────────────────────────
+const RATIO_TYPES = new Set([
+  ENTITY_TYPES.RECTANGLE,
+  ENTITY_TYPES.BITMAP,
+  ENTITY_TYPES.GRAPH,
+  ENTITY_TYPES.TEXT,
+]);
+
+function constrainedResize(startParams, handleId, totalDx, totalDy) {
+  const sp = startParams;
+  const ri = Math.round;
+  const ratio = sp.width / sp.height;
+  let newW = sp.width, newH = sp.height, newX = sp.x, newY = sp.y;
+
+  if (handleId.includes("l")) { newW = Math.max(1, sp.width - totalDx); newX = sp.x + totalDx; }
+  if (handleId.includes("r")) { newW = Math.max(1, sp.width + totalDx); }
+  if (handleId.includes("t")) { newH = Math.max(1, sp.height - totalDy); newY = sp.y + totalDy; }
+  if (handleId.includes("b")) { newH = Math.max(1, sp.height + totalDy); }
+
+  const isCorner =
+    (handleId.includes("l") || handleId.includes("r")) &&
+    (handleId.includes("t") || handleId.includes("b"));
+
+  if (isCorner) {
+    if (Math.abs(newW - sp.width) >= Math.abs(newH - sp.height)) {
+      const ch = Math.max(1, ri(newW / ratio));
+      if (handleId.includes("t")) newY = sp.y + (sp.height - ch);
+      newH = ch;
+    } else {
+      const cw = Math.max(1, ri(newH * ratio));
+      if (handleId.includes("l")) newX = sp.x + (sp.width - cw);
+      newW = cw;
+    }
+  } else if (handleId === "tm" || handleId === "bm") {
+    newW = Math.max(1, ri(newH * ratio));
+  } else {
+    newH = Math.max(1, ri(newW / ratio));
+  }
+
+  return { ...sp, width: ri(newW), height: ri(newH), x: ri(newX), y: ri(newY) };
+}
+
+// ─── Bitmap quantization ───────────────────────────────────────────────────
+const quantizeCache = new Map(); // key: `${src}:${colorMode}` → HTMLCanvasElement
+
+function cssToRGB(css) {
+  if (css.startsWith("#")) {
+    const h = css.slice(1);
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  const m = css.match(/(\d+),\s*(\d+),\s*(\d+)/);
+  return m ? [+m[1], +m[2], +m[3]] : [0, 0, 0];
+}
+
+function quantizeImage(src, colorMode, onReady) {
+  const key = `${src}:${colorMode}`;
+  if (quantizeCache.has(key)) { onReady(quantizeCache.get(key)); return; }
+  const palette = (COLOR_MODES[colorMode] ?? COLOR_MODES["3bit"]).map((c) => cssToRGB(c.css));
+  const img = new Image();
+  img.onload = () => {
+    const off = document.createElement("canvas");
+    off.width = img.naturalWidth;
+    off.height = img.naturalHeight;
+    const octx = off.getContext("2d");
+    octx.drawImage(img, 0, 0);
+    const imageData = octx.getImageData(0, 0, off.width, off.height);
+    const d = imageData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      let best = 0, bestDist = Infinity;
+      for (let j = 0; j < palette.length; j++) {
+        const dr = d[i] - palette[j][0], dg = d[i + 1] - palette[j][1], db = d[i + 2] - palette[j][2];
+        const dist = dr * dr + dg * dg + db * db;
+        if (dist < bestDist) { bestDist = dist; best = j; }
+      }
+      d[i] = palette[best][0]; d[i + 1] = palette[best][1]; d[i + 2] = palette[best][2];
+    }
+    octx.putImageData(imageData, 0, 0);
+    quantizeCache.set(key, off);
+    onReady(off);
+  };
+  img.src = src;
+}
+
 // ─── Canvas rendering ──────────────────────────────────────────────────────
-function renderEntity(ctx, entity, colorMode) {
+function renderEntity(ctx, entity, colorMode, onImageReady = () => {}) {
   const p = entity.params;
   const c = colorToCSS(p.color, colorMode);
   ctx.strokeStyle = c;
@@ -167,6 +250,22 @@ function renderEntity(ctx, entity, colorMode) {
       ctx.clip();
       lines.forEach((line, i) => ctx.fillText(line, p.x, p.y + size + i * size));
       ctx.restore();
+      break;
+    }
+    case ENTITY_TYPES.BITMAP: {
+      const key = `${p.src}:${colorMode}`;
+      if (p.src && quantizeCache.has(key)) {
+        ctx.drawImage(quantizeCache.get(key), p.x, p.y, p.width, p.height);
+      } else {
+        ctx.strokeStyle = "#aaa";
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(p.x, p.y, p.width, p.height);
+        ctx.setLineDash([]);
+        ctx.font = "10px monospace";
+        ctx.fillStyle = "#aaa";
+        ctx.fillText(p.src ? "Loading…" : "Bitmap", p.x + 4, p.y + 14);
+        if (p.src) quantizeImage(p.src, colorMode, onImageReady);
+      }
       break;
     }
     case ENTITY_TYPES.GRAPH:
@@ -358,6 +457,8 @@ export default function Canvas() {
   const NAVBAR_H = 80;
   const V_MARGIN = 48; // breathing room top/bottom
 
+  const [bitmapTick, setBitmapTick] = useState(0);
+
   const [viewport, setViewport] = useState({
     w: window.innerWidth - PANEL_W - FRAME_PAD,
     h: window.innerHeight - NAVBAR_H - FRAME_PAD - V_MARGIN,
@@ -378,6 +479,7 @@ export default function Canvas() {
 
   // ── Draw ──────────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
+    void bitmapTick; // version counter — forces redraw when bitmap images finish loading
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -392,12 +494,13 @@ export default function Canvas() {
       ctx.stroke();
     }
     const colorMode = display.colorMode ?? "3bit";
+    const onImageReady = () => setBitmapTick((t) => t + 1);
     entities.forEach((entity) => {
-      renderEntity(ctx, entity, colorMode);
+      renderEntity(ctx, entity, colorMode, onImageReady);
       if (entity.id === selectedEntityId)
         renderSelectionAndHandles(ctx, entity);
     });
-  }, [entities, selectedEntityId, cw, ch, grid, display]);
+  }, [entities, selectedEntityId, cw, ch, grid, display, bitmapTick]);
 
   useLayoutEffect(() => {
     draw();
@@ -431,6 +534,7 @@ export default function Canvas() {
               startY: y,
               startHandleX: h.x,
               startHandleY: h.y,
+              startParams: { ...sel.params },
               appliedDx: 0,
               appliedDy: 0,
               accumX: 0,
@@ -488,6 +592,23 @@ export default function Canvas() {
       }
       canvasRef.current.style.cursor = "crosshair";
       return;
+    }
+
+    // Shift-constrained resize — absolute from startParams, no accumulator
+    if (dr.mode === "resize" && e.shiftKey) {
+      const entity = entities.find((en) => en.id === dr.id);
+      if (entity && RATIO_TYPES.has(entity.type) && dr.startParams) {
+        if (grid.enabled) {
+          const snap = grid.size;
+          const snappedDx = Math.round((dr.startHandleX + x - dr.startX) / snap) * snap - dr.startHandleX;
+          const snappedDy = Math.round((dr.startHandleY + y - dr.startY) / snap) * snap - dr.startHandleY;
+          updateEntity(dr.id, constrainedResize(dr.startParams, dr.handleId, snappedDx, snappedDy));
+        } else {
+          updateEntity(dr.id, constrainedResize(dr.startParams, dr.handleId, x - dr.startX, y - dr.startY));
+        }
+        dr.lastX = x; dr.lastY = y; dr.accumX = 0; dr.accumY = 0;
+        return;
+      }
     }
 
     // Sub-pixel accumulator → integer deltas
