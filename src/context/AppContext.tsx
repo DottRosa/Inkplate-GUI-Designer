@@ -227,6 +227,19 @@ export function AppProvider({ children }) {
     );
   }, []);
 
+  const reorderEntities = useCallback((fromId: string, toId: string) => {
+    setEntities((prev) => {
+      const fromIndex = prev.findIndex((e) => e.id === fromId);
+      const toIndex = prev.findIndex((e) => e.id === toId);
+      if (fromIndex === -1 || toIndex === -1) return prev;
+      const next = [...prev];
+      const [item] = next.splice(fromIndex, 1);
+      const insertAt = next.findIndex((e) => e.id === toId);
+      next.splice(fromIndex < toIndex ? insertAt + 1 : insertAt, 0, item);
+      return next;
+    });
+  }, []);
+
   const deleteEntity = useCallback((id) => {
     setEntities((prev) => prev.filter((e) => e.id !== id));
     setSelectedEntityId((prev) => (prev === id ? null : prev));
@@ -362,6 +375,7 @@ export function AppProvider({ children }) {
         selectEntity,
         updateEntity,
         deleteEntity,
+        reorderEntities,
         moveEntity,
         renameEntity,
         // Tool
