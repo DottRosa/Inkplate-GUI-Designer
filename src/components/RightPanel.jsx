@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useApp, ENTITY_TYPES, COLOR_MODES } from "../context/AppContext";
 
 // ─── Small reusable form controls ─────────────────────────────────────────
@@ -91,14 +92,14 @@ function CheckboxInput({ label, value, onChange }) {
 }
 
 // ─── Per-type param forms ─────────────────────────────────────────────────
-function PixelForm({ p, set }) {
+function PencilForm({ p, set }) {
+  const count = p.pixels?.length ?? 0;
   return (
     <>
-      <FieldRow>
-        <FieldCell label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></FieldCell>
-        <FieldCell label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></FieldCell>
-      </FieldRow>
       <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
+      {count > 0 && (
+        <p className="text-xs font-mono text-gray-400 mt-1">{count} pixel{count !== 1 ? "s" : ""}</p>
+      )}
     </>
   );
 }
@@ -201,6 +202,7 @@ function GraphForm({ p, set }) {
         <FieldCell label="Width"><NumberInput value={p.width} min={20} onChange={(v) => set("width", v)} /></FieldCell>
         <FieldCell label="Height"><NumberInput value={p.height} min={20} onChange={(v) => set("height", v)} /></FieldCell>
       </FieldRow>
+      <Field label="Data points"><NumberInput value={p.n} min={2} max={128} onChange={(v) => set("n", v)} /></Field>
       <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
     </>
   );
@@ -214,6 +216,10 @@ function ClockForm({ p, set }) {
         <FieldCell label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></FieldCell>
       </FieldRow>
       <Field label="Radius"><NumberInput value={p.radius} min={10} onChange={(v) => set("radius", v)} /></Field>
+      <FieldRow>
+        <FieldCell label="Hour (0–11)"><NumberInput value={p.h} min={0} max={11} onChange={(v) => set("h", v)} /></FieldCell>
+        <FieldCell label="Minute (0–59)"><NumberInput value={p.m} min={0} max={59} onChange={(v) => set("m", v)} /></FieldCell>
+      </FieldRow>
       <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
     </>
   );
@@ -226,7 +232,11 @@ function DigitalClockForm({ p, set }) {
         <FieldCell label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></FieldCell>
         <FieldCell label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></FieldCell>
       </FieldRow>
-      <Field label="Font size"><NumberInput value={p.fontSize} min={1} max={10} onChange={(v) => set("fontSize", v)} /></Field>
+      <Field label="Size"><NumberInput value={p.fontSize} min={1} max={20} onChange={(v) => set("fontSize", v)} /></Field>
+      <FieldRow>
+        <FieldCell label="Hour (0–23)"><NumberInput value={p.h} min={0} max={23} onChange={(v) => set("h", v)} /></FieldCell>
+        <FieldCell label="Minute (0–59)"><NumberInput value={p.m} min={0} max={59} onChange={(v) => set("m", v)} /></FieldCell>
+      </FieldRow>
       <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
     </>
   );
@@ -269,7 +279,7 @@ function BitmapForm({ p, set }) {
 }
 
 const FORMS = {
-  [ENTITY_TYPES.PIXEL]: PixelForm,
+  [ENTITY_TYPES.PENCIL]: PencilForm,
   [ENTITY_TYPES.LINE]: LineForm,
   [ENTITY_TYPES.RECTANGLE]: RectForm,
   [ENTITY_TYPES.CIRCLE]: CircleForm,
@@ -281,60 +291,134 @@ const FORMS = {
   [ENTITY_TYPES.DIGITAL_CLOCK]: DigitalClockForm,
 };
 
+// ─── Layers panel ──────────────────────────────────────────────────────────
+function EntityItem({ entity, selected, onClick, onDelete, onDragStart, onDragOver, onDrop, onDragEnd, dragOver }) {
+  return (
+    <div
+      draggable
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; onDragStart(entity.id); }}
+      onDragOver={(e) => { e.preventDefault(); onDragOver(entity.id); }}
+      onDrop={(e) => { e.preventDefault(); onDrop(entity.id); }}
+      onDragEnd={onDragEnd}
+      className={`flex items-center justify-between group px-1 py-0.5 rounded cursor-pointer text-xs font-mono transition-colors
+        ${selected ? "bg-violet-200 text-violet-900 font-semibold" : "text-gray-700 hover:bg-gray-100"}
+        ${dragOver ? "border border-violet-400" : "border border-transparent"}`}
+      onClick={onClick}
+    >
+      <span className="text-gray-400 mr-1 cursor-grab select-none text-[10px]">⠿</span>
+      <span className="flex-1 truncate">{entity.name ?? entity.id}</span>
+      <button
+        onClick={(e) => { e.stopPropagation(); onDelete(entity.id); }}
+        className="hidden group-hover:block text-red-400 hover:text-red-600 text-xs px-1 leading-none"
+        title="Delete"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+function LayersPanel() {
+  const { entities, selectedEntityId, selectEntity, deleteEntity, reorderEntities } = useApp();
+  const [dragId, setDragId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
+
+  const handleDrop = (toId) => {
+    if (dragId && dragId !== toId) reorderEntities(dragId, toId);
+    setDragId(null);
+    setDragOverId(null);
+  };
+
+  const reversed = [...entities].reverse();
+
+  return (
+    <div className="border-t border-gray-200 flex flex-col" style={{ height: 180, flexShrink: 0 }}>
+      <p className="font-bold text-xs font-mono text-gray-600 uppercase tracking-wider px-3 py-1.5 shrink-0 select-none">
+        Layers
+      </p>
+      <div className="overflow-y-auto px-2 pb-2">
+        {reversed.length === 0 && (
+          <p className="text-xs text-gray-400 font-mono italic px-1">No entities yet</p>
+        )}
+        {reversed.map((entity) => (
+          <EntityItem
+            key={entity.id}
+            entity={entity}
+            selected={selectedEntityId === entity.id}
+            onClick={() => selectEntity(entity.id)}
+            onDelete={deleteEntity}
+            onDragStart={setDragId}
+            onDragOver={setDragOverId}
+            onDrop={handleDrop}
+            onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+            dragOver={dragOverId === entity.id}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main panel ────────────────────────────────────────────────────────────
 export default function RightPanel() {
   const {
     activeTool,
     toolParams,
     updateToolParam,
-    createEntity,
-    selectedEntityId,
     selectedEntity,
     updateEntity,
     renameEntity,
   } = useApp();
 
-  // If an entity is selected, show its edit form
-  if (selectedEntity) {
-    const Form = FORMS[selectedEntity.type] ?? (() => null);
-    const set = (key, val) => updateEntity(selectedEntity.id, { [key]: val });
+  const isSelect = activeTool === ENTITY_TYPES.SELECT;
 
+  const PropertiesContent = () => {
+    if (selectedEntity) {
+      const Form = FORMS[selectedEntity.type] ?? (() => null);
+      const set = (key, val) => updateEntity(selectedEntity.id, { [key]: val });
+      return (
+        <>
+          <Field label="Name">
+            <TextInput
+              value={selectedEntity.name ?? selectedEntity.id}
+              onChange={(v) => renameEntity(selectedEntity.id, v)}
+            />
+          </Field>
+          <div className="border-t border-gray-100 my-3" />
+          <Form p={selectedEntity.params} set={set} />
+        </>
+      );
+    }
+
+    if (isSelect) {
+      return (
+        <p className="text-xs font-mono text-gray-400 leading-relaxed mt-1">
+          Select an entity on canvas, or pick a tool to create one.
+        </p>
+      );
+    }
+
+    const Form = FORMS[activeTool] ?? (() => null);
+    const set = (key, val) => updateToolParam(key, val);
     return (
-      <aside className="w-56 bg-white border-l border-gray-200 overflow-y-auto shrink-0 px-3 py-3">
+      <>
         <h2 className="font-bold text-sm font-mono text-gray-900 mb-3">
-          Edit: {selectedEntity.name ?? selectedEntity.id}
+          {`New ${activeTool.toLowerCase()}`}
         </h2>
-        <Field label="Name">
-          <TextInput
-            value={selectedEntity.name ?? selectedEntity.id}
-            onChange={(v) => renameEntity(selectedEntity.id, v)}
-          />
-        </Field>
-        <div className="border-t border-gray-100 my-3" />
-        <Form p={selectedEntity.params} set={set} />
-      </aside>
+        <Form p={toolParams} set={set} />
+        <p className="mt-3 text-xs font-mono text-gray-400 leading-relaxed">
+          Click canvas to place.
+        </p>
+      </>
     );
-  }
-
-  // Otherwise show the creation form for the active tool
-  const Form = FORMS[activeTool] ?? (() => null);
-  const set = (key, val) => updateToolParam(key, val);
+  };
 
   return (
-    <aside className="w-56 bg-white border-l border-gray-200 overflow-y-auto shrink-0 px-3 py-3">
-      <h2 className="font-bold text-sm font-mono text-gray-900 mb-3">
-        Create new {activeTool.toLowerCase()}
-      </h2>
-
-      <Form p={toolParams} set={set} />
-
-      <button
-        onClick={createEntity}
-        className="mt-4 w-full text-sm font-mono text-gray-900 border border-gray-400 rounded px-3 py-1.5
-          hover:bg-gray-100 active:bg-gray-200 transition-colors"
-      >
-        Create Entity
-      </button>
+    <aside className="w-72 bg-white border-l border-gray-200 flex flex-col shrink-0" style={{ minHeight: 0 }}>
+      <div className="flex-1 overflow-y-auto px-3 py-3 min-h-0">
+        {PropertiesContent()}
+      </div>
+      <LayersPanel />
     </aside>
   );
 }

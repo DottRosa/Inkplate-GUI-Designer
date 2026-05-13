@@ -53,8 +53,8 @@ export const DISPLAYS = {
 
 // ─── Entity type definitions ───────────────────────────────────────────────
 export const ENTITY_TYPES = {
+  SELECT: "Select",
   // Shapes
-  PIXEL: "Pixel",
   LINE: "Line",
   RECTANGLE: "Rectangle",
   CIRCLE: "Circle",
@@ -69,7 +69,6 @@ export const ENTITY_TYPES = {
 
 // Default params per entity type
 export const DEFAULT_PARAMS = {
-  [ENTITY_TYPES.PIXEL]: { x: 100, y: 100, color: 0 },
   [ENTITY_TYPES.LINE]: {
     x0: 50,
     y0: 50,
@@ -113,42 +112,44 @@ export const DEFAULT_PARAMS = {
     color: 0,
   },
   [ENTITY_TYPES.BITMAP]: { x: 0, y: 0, width: 100, height: 100, data: "" },
-  [ENTITY_TYPES.GRAPH]: { x: 50, y: 50, width: 200, height: 150, color: 0 },
-  [ENTITY_TYPES.CLOCK]: { x: 100, y: 100, radius: 80, color: 0 },
-  [ENTITY_TYPES.DIGITAL_CLOCK]: { x: 100, y: 100, fontSize: 3, color: 0 },
+  [ENTITY_TYPES.GRAPH]: { x: 50, y: 50, width: 300, height: 200, color: 0, n: 32, data: [] },
+  [ENTITY_TYPES.CLOCK]: { x: 100, y: 100, radius: 80, color: 0, h: 10, m: 10 },
+  [ENTITY_TYPES.DIGITAL_CLOCK]: { x: 100, y: 100, fontSize: 8, color: 0, h: 10, m: 10 },
 };
 
-// ─── Centering helper ──────────────────────────────────────────────────────
-function centerParams(type: string, params: Record<string, any>, display: { width: number; height: number }): Record<string, any> {
-  const cx = Math.round(display.width / 2);
-  const cy = Math.round(display.height / 2);
+// ─── Placement helpers ─────────────────────────────────────────────────────
+export function placeAtParams(type: string, params: Record<string, any>, x: number, y: number): Record<string, any> {
   const p = { ...params };
   switch (type) {
-    case ENTITY_TYPES.PIXEL:
-      return { ...p, x: cx, y: cy };
     case ENTITY_TYPES.LINE: {
       const hdx = Math.round((p.x1 - p.x0) / 2);
       const hdy = Math.round((p.y1 - p.y0) / 2);
-      return { ...p, x0: cx - hdx, y0: cy - hdy, x1: cx + hdx, y1: cy + hdy };
+      return { ...p, x0: x - hdx, y0: y - hdy, x1: x + hdx, y1: y + hdy };
     }
     case ENTITY_TYPES.RECTANGLE:
     case ENTITY_TYPES.BITMAP:
     case ENTITY_TYPES.GRAPH:
     case ENTITY_TYPES.TEXT:
-      return { ...p, x: Math.round(cx - p.width / 2), y: Math.round(cy - p.height / 2) };
+      return { ...p, x: Math.round(x - p.width / 2), y: Math.round(y - p.height / 2) };
     case ENTITY_TYPES.CIRCLE:
+      return { ...p, cx: x, cy: y };
     case ENTITY_TYPES.CLOCK:
-      return { ...p, cx, cy };
+      return { ...p, x, y };
     case ENTITY_TYPES.TRIANGLE: {
       const tcx = Math.round((p.x0 + p.x1 + p.x2) / 3);
       const tcy = Math.round((p.y0 + p.y1 + p.y2) / 3);
-      return { ...p, x0: p.x0 + cx - tcx, y0: p.y0 + cy - tcy, x1: p.x1 + cx - tcx, y1: p.y1 + cy - tcy, x2: p.x2 + cx - tcx, y2: p.y2 + cy - tcy };
+      return { ...p, x0: p.x0 + x - tcx, y0: p.y0 + y - tcy, x1: p.x1 + x - tcx, y1: p.y1 + y - tcy, x2: p.x2 + x - tcx, y2: p.y2 + y - tcy };
     }
     case ENTITY_TYPES.DIGITAL_CLOCK:
-      return { ...p, x: cx, y: cy };
+      return { ...p, x, y };
     default:
       return p;
   }
+}
+
+// ─── Centering helper ──────────────────────────────────────────────────────
+function centerParams(type: string, params: Record<string, any>, display: { width: number; height: number }): Record<string, any> {
+  return placeAtParams(type, params, Math.round(display.width / 2), Math.round(display.height / 2));
 }
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -172,7 +173,7 @@ export function AppProvider({ children }) {
   const [selectedDisplay, setSelectedDisplay] = useState("inkplate6");
   const [entities, setEntities] = useState<Entity[]>([]);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
-  const [activeTool, setActiveTool] = useState(ENTITY_TYPES.CIRCLE);
+  const [activeTool, setActiveTool] = useState(ENTITY_TYPES.SELECT);
   const [toolParams, setToolParams] = useState<Record<string, any>>(
     DEFAULT_PARAMS[ENTITY_TYPES.CIRCLE],
   );
@@ -262,6 +263,16 @@ export function AppProvider({ children }) {
     setSelectedEntityId(id);
     return id;
   }, [activeTool, toolParams, display, pushHistory]);
+
+  const createEntityAt = useCallback((x: number, y: number) => {
+    pushHistory();
+    const id = generateId(activeTool);
+    const placed = placeAtParams(activeTool, toolParams, x, y);
+    const newEntity = { id, name: id, type: activeTool, params: placed };
+    setEntities((prev) => [...prev, newEntity]);
+    setSelectedEntityId(id);
+    return id;
+  }, [activeTool, toolParams, pushHistory]);
 
   const renameEntity = useCallback((id: string, newName: string) => {
     pushHistory();
@@ -401,9 +412,6 @@ export function AppProvider({ children }) {
             `  display.drawLine(${p.x0}, ${p.y0}, ${p.x1}, ${p.y1}, ${p.color});`,
           );
           break;
-        case ENTITY_TYPES.PIXEL:
-          lines.push(`  display.drawPixel(${p.x}, ${p.y}, ${p.color});`);
-          break;
         default:
           lines.push(`  // ${e.id}: ${e.type} (manual implementation needed)`);
       }
@@ -435,6 +443,7 @@ export function AppProvider({ children }) {
         selectedEntityId,
         selectedEntity,
         createEntity,
+        createEntityAt,
         selectEntity,
         updateEntity,
         deleteEntity,

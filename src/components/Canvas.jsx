@@ -1,5 +1,5 @@
 import { useRef, useEffect, useLayoutEffect, useCallback, useState } from "react";
-import { useApp, ENTITY_TYPES, COLOR_MODES } from "../context/AppContext";
+import { useApp, ENTITY_TYPES, COLOR_MODES, placeAtParams } from "../context/AppContext";
 
 const HANDLE_SIZE = 8; // canvas px
 
@@ -202,9 +202,6 @@ function renderEntity(ctx, entity, colorMode, onImageReady = () => {}) {
   ctx.lineWidth = p.thickness ?? 1;
 
   switch (entity.type) {
-    case ENTITY_TYPES.PIXEL:
-      ctx.fillRect(p.x, p.y, 2, 2);
-      break;
     case ENTITY_TYPES.LINE:
       ctx.beginPath();
       ctx.moveTo(p.x0, p.y0);
@@ -268,36 +265,153 @@ function renderEntity(ctx, entity, colorMode, onImageReady = () => {}) {
       }
       break;
     }
-    case ENTITY_TYPES.GRAPH:
-      ctx.strokeStyle = "#555";
-      ctx.setLineDash([4, 4]);
-      ctx.strokeRect(p.x, p.y, p.width, p.height);
-      ctx.setLineDash([]);
-      ctx.font = "10px monospace";
-      ctx.fillStyle = "#888";
-      ctx.fillText("Graph", p.x + 4, p.y + 14);
+    case ENTITY_TYPES.GRAPH: {
+      const n = p.n ?? 32;
+      let data = p.data && p.data.length > 0 ? p.data : null;
+      if (!data) {
+        data = Array.from({ length: n }, (_, i) => Math.sin(Math.PI * 3 * i / n));
+      }
+      const textMargin = 68;
+      const x1 = p.x, y1 = p.y;
+      const x2 = p.x + p.width, y2 = p.y + p.height;
+      const minData = Math.min(...data);
+      const maxData = Math.max(...data);
+      const span = Math.max(0.3, Math.abs(maxData - minData));
+      const pts = data.map((v, i) => ({
+        x: x1 + i * (x2 - x1 - textMargin) / n,
+        y: y2 - (v - minData) * Math.abs(y2 - y1) / span,
+      }));
+      // Gradient fill under line
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.fillStyle = c;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, y2);
+      for (const pt of pts) ctx.lineTo(pt.x, pt.y);
+      ctx.lineTo(pts[pts.length - 1].x, y2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      ctx.strokeStyle = c;
+      ctx.fillStyle = c;
+      // Grid: 4 horizontal lines + axis labels
+      ctx.lineWidth = 0.5;
+      ctx.font = "9px monospace";
+      for (let i = 0; i < 4; i++) {
+        const gy = y1 + i * (y2 - y1) / 4;
+        ctx.beginPath();
+        ctx.moveTo(x1, gy);
+        ctx.lineTo(x2, gy);
+        ctx.stroke();
+        const val = (minData + (maxData - minData) * (4 - i) / 4).toFixed(2);
+        ctx.fillText(val, x2 - textMargin + 4, gy + 10);
+      }
+      // 5 vertical lines
+      for (let i = 0; i < 5; i++) {
+        const gx = x1 + i * (x2 - x1) / 5;
+        ctx.beginPath();
+        ctx.moveTo(gx, y1);
+        ctx.lineTo(gx, y2);
+        ctx.stroke();
+      }
+      // Separator before label area
+      ctx.beginPath();
+      ctx.moveTo(x2 - textMargin + 2, y1);
+      ctx.lineTo(x2 - textMargin + 2, y2);
+      ctx.stroke();
+      // Data line
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+      // Bottom border
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x1, y2);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
       break;
+    }
     case ENTITY_TYPES.CLOCK: {
+      const cx = p.x, cy = p.y, r = p.radius;
+      const h = p.h ?? 10;
+      const m = p.m ?? 10;
+      const r0 = r * 0.55;
+      const r1 = r * 0.65;
+      const r2 = r * 0.9;
+      const r3 = r * 1.0;
+      // Outer circle
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.stroke();
-      const now = new Date();
-      const hAng = ((now.getHours() % 12) / 12) * Math.PI * 2 - Math.PI / 2;
-      const mAng = (now.getMinutes() / 60) * Math.PI * 2 - Math.PI / 2;
+      // Tick marks
+      for (let i = 0; i < 60; i++) {
+        const angle = (i / 60) * Math.PI * 2;
+        const cos = Math.cos(angle), sin = Math.sin(angle);
+        if (i % 5 === 0) {
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(cx + r1 * cos, cy + r1 * sin);
+          ctx.lineTo(cx + r3 * cos, cy + r3 * sin);
+          ctx.stroke();
+        } else if (r > 75) {
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(cx + r1 * cos, cy + r1 * sin);
+          ctx.lineTo(cx + r2 * cos, cy + r2 * sin);
+          ctx.stroke();
+        }
+      }
+      // Hour hand: angle = (h - 3 + m/60) / 12 * 2π
+      const hAngle = (h - 3 + m / 60) / 12 * Math.PI * 2;
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-      ctx.lineTo(p.x + Math.cos(hAng) * p.radius * 0.5, p.y + Math.sin(hAng) * p.radius * 0.5);
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + r0 * Math.cos(hAngle), cy + r0 * Math.sin(hAngle));
       ctx.stroke();
+      // Minute hand: angle = (m - 15) / 60 * 2π
+      const mAngle = (m - 15) / 60 * Math.PI * 2;
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-      ctx.lineTo(p.x + Math.cos(mAng) * p.radius * 0.7, p.y + Math.sin(mAng) * p.radius * 0.7);
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + r2 * Math.cos(mAngle), cy + r2 * Math.sin(mAngle));
       ctx.stroke();
       break;
     }
     case ENTITY_TYPES.DIGITAL_CLOCK: {
-      const size = (p.fontSize ?? 3) * 8;
-      ctx.font = `${size}px "Courier New", monospace`;
-      ctx.fillText(new Date().toLocaleTimeString(), p.x, p.y + size);
+      const h = p.h ?? 10;
+      const m = p.m ?? 10;
+      const size = (p.fontSize ?? 8) * 8;
+      const bitmask = [119, 48, 93, 121, 58, 107, 111, 49, 127, 59];
+      const triangleX = [83, 101, 108, 101, 108, 277, 101, 108, 277, 257, 277, 108, 257, 277, 286, 76, 60, 98, 60, 98, 80, 80, 39, 60, 80, 39, 55, 31, 55, 73, 31, 73, 52, 31, 9, 52, 9, 52, 20, 61, 86, 80, 86, 80, 233, 233, 227, 80, 233, 227, 252, 260, 292, 305, 305, 260, 240, 305, 281, 240, 240, 281, 260, 259, 234, 276, 234, 276, 256, 256, 214, 234, 214, 256, 237, 38, 27, 60, 38, 60, 207, 207, 38, 212, 212, 207, 230];
+      const triangleY = [30, 13, 60, 13, 60, 14, 13, 60, 14, 57, 14, 60, 57, 14, 29, 36, 47, 61, 47, 61, 198, 198, 201, 47, 198, 201, 219, 252, 232, 253, 252, 253, 390, 252, 406, 390, 406, 390, 416, 227, 202, 249, 202, 249, 203, 203, 247, 249, 203, 247, 224, 60, 35, 49, 49, 60, 200, 50, 201, 200, 200, 201, 220, 231, 252, 252, 252, 252, 403, 403, 390, 252, 390, 403, 415, 439, 424, 392, 439, 392, 394, 394, 439, 439, 439, 394, 424];
+      const maxX = 310, maxY = 440;
+      const digits = [Math.floor(h / 10) % 10, h % 10, Math.floor(m / 10) % 10, m % 10];
+      ctx.fillStyle = c;
+      for (let i = 0; i < 4; i++) {
+        const b = bitmask[digits[i]];
+        for (let j = 0; j < triangleX.length; j += 3) {
+          if (b & (1 << Math.trunc((j - 1) / 12))) {
+            ctx.beginPath();
+            ctx.moveTo(i * maxX / maxY * size * 1.1 + p.x + maxX / maxY * size * triangleX[j] / maxX, p.y + size * triangleY[j] / maxY);
+            ctx.lineTo(i * maxX / maxY * size * 1.1 + p.x + maxX / maxY * size * triangleX[j + 1] / maxX, p.y + size * triangleY[j + 1] / maxY);
+            ctx.lineTo(i * maxX / maxY * size * 1.1 + p.x + maxX / maxY * size * triangleX[j + 2] / maxX, p.y + size * triangleY[j + 2] / maxY);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+      }
+      // Colon dots
+      const dotR = 0.05 * size;
+      const colonX = p.x + 4 * maxX / maxY * size * 1.075 / 2;
+      ctx.beginPath();
+      ctx.arc(colonX, p.y + size * 0.4, dotR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(colonX, p.y + size * 0.6, dotR, 0, Math.PI * 2);
+      ctx.fill();
       break;
     }
     default:
@@ -320,12 +434,6 @@ function renderSelectionAndHandles(ctx, entity) {
       bw = p.radius * 2 + 12;
       bh = p.radius * 2 + 12;
       break;
-    case ENTITY_TYPES.PIXEL:
-      bx = p.x - 4;
-      by = p.y - 4;
-      bw = 10;
-      bh = 10;
-      break;
     case ENTITY_TYPES.LINE:
       bx = Math.min(p.x0, p.x1) - 4;
       by = Math.min(p.y0, p.y1) - 4;
@@ -338,6 +446,20 @@ function renderSelectionAndHandles(ctx, entity) {
       bw = Math.max(p.x0, p.x1, p.x2) - bx + 6;
       bh = Math.max(p.y0, p.y1, p.y2) - by + 6;
       break;
+    case ENTITY_TYPES.CLOCK:
+      bx = p.x - p.radius - 6;
+      by = p.y - p.radius - 6;
+      bw = p.radius * 2 + 12;
+      bh = p.radius * 2 + 12;
+      break;
+    case ENTITY_TYPES.DIGITAL_CLOCK: {
+      const dcSize = (p.fontSize ?? 8) * 8;
+      bx = p.x - 6;
+      by = p.y - 6;
+      bw = Math.round(4 * (310 / 440) * dcSize * 1.1) + 12;
+      bh = dcSize + 12;
+      break;
+    }
     default:
       bx = (p.x ?? p.cx ?? 0) - 6;
       by = (p.y ?? p.cy ?? 0) - 6;
@@ -366,9 +488,6 @@ function getEntityBBox(entity) {
       bx = p.cx - p.radius - 6; by = p.cy - p.radius - 6;
       bw = p.radius * 2 + 12; bh = p.radius * 2 + 12;
       break;
-    case ENTITY_TYPES.PIXEL:
-      bx = p.x - 4; by = p.y - 4; bw = 10; bh = 10;
-      break;
     case ENTITY_TYPES.LINE:
       bx = Math.min(p.x0, p.x1) - 4; by = Math.min(p.y0, p.y1) - 4;
       bw = Math.abs(p.x1 - p.x0) + 8; bh = Math.abs(p.y1 - p.y0) + 8;
@@ -377,6 +496,17 @@ function getEntityBBox(entity) {
       bx = Math.min(p.x0, p.x1, p.x2) - 6; by = Math.min(p.y0, p.y1, p.y2) - 6;
       bw = Math.max(p.x0, p.x1, p.x2) - bx + 6; bh = Math.max(p.y0, p.y1, p.y2) - by + 6;
       break;
+    case ENTITY_TYPES.CLOCK:
+      bx = p.x - p.radius - 6; by = p.y - p.radius - 6;
+      bw = p.radius * 2 + 12; bh = p.radius * 2 + 12;
+      break;
+    case ENTITY_TYPES.DIGITAL_CLOCK: {
+      const dcSize = (p.fontSize ?? 8) * 8;
+      bx = p.x - 6; by = p.y - 6;
+      bw = Math.round(4 * (310 / 440) * dcSize * 1.1) + 12;
+      bh = dcSize + 12;
+      break;
+    }
     default:
       bx = (p.x ?? p.cx ?? 0) - 6; by = (p.y ?? p.cy ?? 0) - 6;
       bw = (p.width ?? (p.radius ? p.radius * 2 : 80)) + 12;
@@ -414,7 +544,6 @@ function hitTest(entity, mx, my) {
       return Math.hypot(mx - (p.x0 + t * dx), my - (p.y0 + t * dy)) <= pad;
     }
     case ENTITY_TYPES.TRIANGLE:
-      // exact test + fallback to padded bbox for edge clicks
       return (
         pointInTriangle(mx, my, p.x0, p.y0, p.x1, p.y1, p.x2, p.y2) ||
         (mx >= Math.min(p.x0, p.x1, p.x2) - pad &&
@@ -422,8 +551,13 @@ function hitTest(entity, mx, my) {
           my >= Math.min(p.y0, p.y1, p.y2) - pad &&
           my <= Math.max(p.y0, p.y1, p.y2) + pad)
       );
-    case ENTITY_TYPES.PIXEL:
-      return Math.hypot(mx - p.x, my - p.y) <= pad + 2;
+    case ENTITY_TYPES.CLOCK:
+      return Math.hypot(mx - p.x, my - p.y) <= p.radius + pad;
+    case ENTITY_TYPES.DIGITAL_CLOCK: {
+      const dcSize = (p.fontSize ?? 8) * 8;
+      const dcW = Math.round(4 * (310 / 440) * dcSize * 1.1);
+      return mx >= p.x - pad && mx <= p.x + dcW + pad && my >= p.y - pad && my <= p.y + dcSize + pad;
+    }
     default: {
       const ex = p.x ?? p.cx ?? 0;
       const ey = p.y ?? p.cy ?? 0;
@@ -479,7 +613,12 @@ export default function Canvas() {
     deleteEntity,
     pushHistory,
     grid,
+    activeTool,
+    toolParams,
+    createEntityAt,
   } = useApp();
+
+  const [hoverPos, setHoverPos] = useState(null);
 
   const FRAME_PAD = 48; // 24px padding each side of device frame
   const PANEL_W = 400;
@@ -529,7 +668,15 @@ export default function Canvas() {
       if (entity.id === selectedEntityId)
         renderSelectionAndHandles(ctx, entity);
     });
-  }, [entities, selectedEntityId, cw, ch, grid, display, bitmapTick]);
+    if (activeTool && activeTool !== ENTITY_TYPES.SELECT && hoverPos) {
+      const ghostParams = placeAtParams(activeTool, toolParams, hoverPos.x, hoverPos.y);
+      const ghostEntity = { id: "__ghost__", type: activeTool, params: ghostParams };
+      ctx.save();
+      ctx.globalAlpha = 0.4;
+      renderEntity(ctx, ghostEntity, colorMode, () => {});
+      ctx.restore();
+    }
+  }, [entities, selectedEntityId, cw, ch, grid, display, bitmapTick, activeTool, toolParams, hoverPos]);
 
   useLayoutEffect(() => {
     draw();
@@ -546,84 +693,108 @@ export default function Canvas() {
 
   const handlePointerDown = (e) => {
     const { x, y } = toCanvas(e);
+    const isSelectMode = activeTool === ENTITY_TYPES.SELECT;
 
-    // 1. Handles of selected entity take priority
-    if (selectedEntityId) {
-      const sel = entities.find((en) => en.id === selectedEntityId);
-      if (sel) {
-        for (const h of getHandles(sel)) {
-          if (hitHandle(h, x, y)) {
-            pushHistory();
-            dragRef.current = {
-              mode: "resize",
-              id: sel.id,
-              handleId: h.id,
-              lastX: x,
-              lastY: y,
-              startX: x,
-              startY: y,
-              startHandleX: h.x,
-              startHandleY: h.y,
-              startParams: { ...sel.params },
-              appliedDx: 0,
-              appliedDy: 0,
-              accumX: 0,
-              accumY: 0,
-            };
-            canvasRef.current.setPointerCapture(e.pointerId);
-            return;
-          }
-        }
-      }
-    }
-
-    // 2. Entity body
-    for (let i = entities.length - 1; i >= 0; i--) {
-      if (hitTest(entities[i], x, y)) {
-        selectEntity(entities[i].id);
-        pushHistory();
-        const ep = entities[i].params;
-        dragRef.current = {
-          mode: "move",
-          id: entities[i].id,
-          lastX: x,
-          lastY: y,
-          startX: x,
-          startY: y,
-          accumX: 0,
-          accumY: 0,
-          anchorX: ep.x ?? ep.cx ?? ep.x0 ?? 0,
-          anchorY: ep.y ?? ep.cy ?? ep.y0 ?? 0,
-        };
-        canvasRef.current.setPointerCapture(e.pointerId);
-        return;
-      }
-    }
-
-    selectEntity(null);
-  };
-
-  const handlePointerMove = (e) => {
-    const { x, y } = toCanvas(e);
-    const dr = dragRef.current;
-
-    // Update cursor even when not dragging
-    if (!dr) {
+    if (isSelectMode) {
+      // 1. Handles of selected entity take priority
       if (selectedEntityId) {
         const sel = entities.find((en) => en.id === selectedEntityId);
         if (sel) {
           for (const h of getHandles(sel)) {
             if (hitHandle(h, x, y)) {
-              canvasRef.current.style.cursor =
-                HANDLE_CURSORS[h.id] ?? "crosshair";
+              pushHistory();
+              dragRef.current = {
+                mode: "resize",
+                id: sel.id,
+                handleId: h.id,
+                lastX: x,
+                lastY: y,
+                startX: x,
+                startY: y,
+                startHandleX: h.x,
+                startHandleY: h.y,
+                startParams: { ...sel.params },
+                appliedDx: 0,
+                appliedDy: 0,
+                accumX: 0,
+                accumY: 0,
+              };
+              canvasRef.current.setPointerCapture(e.pointerId);
               return;
             }
           }
         }
       }
+
+      // 2. Entity body
+      for (let i = entities.length - 1; i >= 0; i--) {
+        if (hitTest(entities[i], x, y)) {
+          selectEntity(entities[i].id);
+          pushHistory();
+          const ep = entities[i].params;
+          dragRef.current = {
+            mode: "move",
+            id: entities[i].id,
+            lastX: x,
+            lastY: y,
+            startX: x,
+            startY: y,
+            accumX: 0,
+            accumY: 0,
+            anchorX: ep.x ?? ep.cx ?? ep.x0 ?? ep.pixels?.[0]?.x ?? 0,
+            anchorY: ep.y ?? ep.cy ?? ep.y0 ?? ep.pixels?.[0]?.y ?? 0,
+          };
+          canvasRef.current.setPointerCapture(e.pointerId);
+          return;
+        }
+      }
+
+      // Click on empty space → deselect
+      selectEntity(null);
+      return;
+    }
+
+    // Drawing mode: always create, never select existing entities
+    createEntityAt(x, y);
+  };
+
+  const handlePointerMove = (e) => {
+    const { x, y } = toCanvas(e);
+
+    const dr = dragRef.current;
+
+    // Update cursor and ghost even when not dragging
+    if (!dr) {
+      const isSelectMode = activeTool === ENTITY_TYPES.SELECT;
+      if (!isSelectMode) setHoverPos({ x, y });
+      else setHoverPos(null);
+
+      if (isSelectMode) {
+        if (selectedEntityId) {
+          const sel = entities.find((en) => en.id === selectedEntityId);
+          if (sel) {
+            for (const h of getHandles(sel)) {
+              if (hitHandle(h, x, y)) {
+                canvasRef.current.style.cursor = HANDLE_CURSORS[h.id] ?? "default";
+                return;
+              }
+            }
+          }
+        }
+        for (let i = entities.length - 1; i >= 0; i--) {
+          if (hitTest(entities[i], x, y)) {
+            canvasRef.current.style.cursor = "move";
+            return;
+          }
+        }
+        canvasRef.current.style.cursor = "default";
+        return;
+      }
+
       canvasRef.current.style.cursor = "crosshair";
       return;
     }
+    setHoverPos(null);
 
     // Shift-constrained resize — absolute from startParams, no accumulator
     if (dr.mode === "resize" && e.shiftKey) {
@@ -696,6 +867,10 @@ export default function Canvas() {
     dragRef.current = null;
   };
 
+  const handlePointerLeave = () => {
+    setHoverPos(null);
+  };
+
   return (
     <div className="flex-1 bg-gray-400 flex items-center justify-center overflow-hidden">
       <div className="flex flex-col items-center gap-2">
@@ -722,6 +897,7 @@ export default function Canvas() {
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerLeave}
           />
           {selectedEntityId && (() => {
             const sel = entities.find((e) => e.id === selectedEntityId);
