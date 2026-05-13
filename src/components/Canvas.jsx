@@ -358,6 +358,33 @@ function renderSelectionAndHandles(ctx, entity) {
   });
 }
 
+function getEntityBBox(entity) {
+  const p = entity.params;
+  let bx, by, bw, bh;
+  switch (entity.type) {
+    case ENTITY_TYPES.CIRCLE:
+      bx = p.cx - p.radius - 6; by = p.cy - p.radius - 6;
+      bw = p.radius * 2 + 12; bh = p.radius * 2 + 12;
+      break;
+    case ENTITY_TYPES.PIXEL:
+      bx = p.x - 4; by = p.y - 4; bw = 10; bh = 10;
+      break;
+    case ENTITY_TYPES.LINE:
+      bx = Math.min(p.x0, p.x1) - 4; by = Math.min(p.y0, p.y1) - 4;
+      bw = Math.abs(p.x1 - p.x0) + 8; bh = Math.abs(p.y1 - p.y0) + 8;
+      break;
+    case ENTITY_TYPES.TRIANGLE:
+      bx = Math.min(p.x0, p.x1, p.x2) - 6; by = Math.min(p.y0, p.y1, p.y2) - 6;
+      bw = Math.max(p.x0, p.x1, p.x2) - bx + 6; bh = Math.max(p.y0, p.y1, p.y2) - by + 6;
+      break;
+    default:
+      bx = (p.x ?? p.cx ?? 0) - 6; by = (p.y ?? p.cy ?? 0) - 6;
+      bw = (p.width ?? (p.radius ? p.radius * 2 : 80)) + 12;
+      bh = (p.height ?? (p.radius ? p.radius * 2 : 40)) + 12;
+  }
+  return { bx, by, bw, bh };
+}
+
 // ─── Hit testing ──────────────────────────────────────────────────────────
 function triSign(ax, ay, bx, by, cx, cy) {
   return (ax - cx) * (by - cy) - (bx - cx) * (ay - cy);
@@ -449,6 +476,7 @@ export default function Canvas() {
     selectEntity,
     moveEntity,
     updateEntity,
+    deleteEntity,
     grid,
   } = useApp();
 
@@ -692,6 +720,42 @@ export default function Canvas() {
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
           />
+          {selectedEntityId && (() => {
+            const sel = entities.find((e) => e.id === selectedEntityId);
+            if (!sel) return null;
+            const { bx, by, bw } = getEntityBBox(sel);
+            const CANVAS_PAD = 24;
+            const btnX = CANVAS_PAD + (bx + bw) * scale + 10;
+            const btnY = CANVAS_PAD + by * scale - 10;
+            return (
+              <button
+                key={selectedEntityId}
+                onPointerDown={(e) => { e.stopPropagation(); deleteEntity(selectedEntityId); }}
+                style={{
+                  position: "absolute",
+                  left: btnX,
+                  top: btnY,
+                  transform: "translate(-50%, -50%)",
+                  width: 20,
+                  height: 20,
+                  borderRadius: "50%",
+                  background: "#ef4444",
+                  border: "none",
+                  color: "#fff",
+                  fontSize: 12,
+                  lineHeight: 1,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 0,
+                  zIndex: 10,
+                }}
+              >
+                ×
+              </button>
+            );
+          })()}
         </div>
         <div className="text-xs font-mono text-gray-200 select-none">
           {display.width} × {display.height} px &nbsp;·&nbsp; {Math.round(scale * 100)}%
