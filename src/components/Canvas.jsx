@@ -477,6 +477,7 @@ export default function Canvas() {
     moveEntity,
     updateEntity,
     deleteEntity,
+    pushHistory,
     grid,
   } = useApp();
 
@@ -552,6 +553,7 @@ export default function Canvas() {
       if (sel) {
         for (const h of getHandles(sel)) {
           if (hitHandle(h, x, y)) {
+            pushHistory();
             dragRef.current = {
               mode: "resize",
               id: sel.id,
@@ -579,6 +581,7 @@ export default function Canvas() {
     for (let i = entities.length - 1; i >= 0; i--) {
       if (hitTest(entities[i], x, y)) {
         selectEntity(entities[i].id);
+        pushHistory();
         const ep = entities[i].params;
         dragRef.current = {
           mode: "move",

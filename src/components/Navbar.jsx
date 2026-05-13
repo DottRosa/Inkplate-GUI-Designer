@@ -44,7 +44,7 @@ export default function Navbar() {
       <div className="flex items-center gap-1 px-3 py-1.5">
         <button
           onClick={saveProject}
-          className="text-sm font-mono text-white hover:text-yellow-300 transition-colors px-2 py-0.5"
+          className="text-sm font-mono hover:cursor-pointer transition-colors px-2 py-0.5"
         >
           Save
         </button>
@@ -53,7 +53,7 @@ export default function Navbar() {
 
         <button
           onClick={loadProject}
-          className="text-sm font-mono text-white hover:text-yellow-300 transition-colors px-2 py-0.5"
+          className="text-sm font-mono hover:cursor-pointer transition-colors px-2 py-0.5"
         >
           Load
         </button>
@@ -64,17 +64,24 @@ export default function Navbar() {
           <input
             type="checkbox"
             checked={grid.enabled}
-            onChange={(e) => setGrid((g) => ({ ...g, enabled: e.target.checked }))}
+            onChange={(e) =>
+              setGrid((g) => ({ ...g, enabled: e.target.checked }))
+            }
             className="w-3 h-3 accent-yellow-400"
           />
-          <span className="text-sm font-mono text-white">Grid</span>
+          <span className="text-sm font-mono">Grid</span>
         </label>
         <input
           type="number"
           min={10}
           max={50}
           value={grid.size}
-          onChange={(e) => setGrid((g) => ({ ...g, size: Math.max(10, parseInt(e.target.value) || 10) }))}
+          onChange={(e) =>
+            setGrid((g) => ({
+              ...g,
+              size: Math.max(10, parseInt(e.target.value) || 10),
+            }))
+          }
           className="w-12 text-sm font-mono px-1 py-0.5 rounded border border-gray-500 bg-gray-700 text-white text-center"
         />
         <span className="text-xs font-mono text-gray-400">px</span>

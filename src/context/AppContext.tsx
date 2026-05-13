@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useRef } from "react";
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
 
 // ─── Color modes ───────────────────────────────────────────────────────────
 export const COLOR_MODES: Record<string, { label: string; css: string }[]> = {
@@ -180,6 +180,61 @@ export function AppProvider({ children }) {
 
   const entitiesRef = useRef(entities);
   entitiesRef.current = entities;
+  const selectedEntityIdRef = useRef(selectedEntityId);
+  selectedEntityIdRef.current = selectedEntityId;
+  const deleteEntityRef = useRef<(id: string) => void>(() => {});
+
+  // ── History ──────────────────────────────────────────────────────────────
+  const historyRef = useRef<{ past: Entity[][], future: Entity[][] }>({ past: [], future: [] });
+  const [historyVersion, setHistoryVersion] = useState(0);
+
+  const pushHistory = useCallback(() => {
+    historyRef.current.past.push([...entitiesRef.current]);
+    historyRef.current.future = [];
+    if (historyRef.current.past.length > 100) historyRef.current.past.shift();
+    setHistoryVersion((v) => v + 1);
+  }, []);
+
+  const undo = useCallback(() => {
+    const { past, future } = historyRef.current;
+    if (past.length === 0) return;
+    future.unshift([...entitiesRef.current]);
+    setEntities(past.pop()!);
+    setHistoryVersion((v) => v + 1);
+  }, []);
+
+  const redo = useCallback(() => {
+    const { past, future } = historyRef.current;
+    if (future.length === 0) return;
+    past.push([...entitiesRef.current]);
+    setEntities(future.shift()!);
+    setHistoryVersion((v) => v + 1);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isEditing = tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable;
+
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod) {
+        if (e.key === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
+        if ((e.key === "z" && e.shiftKey) || e.key === "y") { e.preventDefault(); redo(); }
+        return;
+      }
+
+      if (!isEditing && (e.key === "Backspace" || e.key === "Delete")) {
+        const id = selectedEntityIdRef.current;
+        if (id) { e.preventDefault(); deleteEntityRef.current(id); }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [undo, redo]);
+
+  void historyVersion;
+  const canUndo = historyRef.current.past.length > 0;
+  const canRedo = historyRef.current.future.length > 0;
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const display = DISPLAYS[selectedDisplay as keyof typeof DISPLAYS];
@@ -199,19 +254,21 @@ export function AppProvider({ children }) {
 
   // ── Entity CRUD ──────────────────────────────────────────────────────────
   const createEntity = useCallback(() => {
+    pushHistory();
     const id = generateId(activeTool);
     const centered = centerParams(activeTool, toolParams, display);
     const newEntity = { id, name: id, type: activeTool, params: centered };
     setEntities((prev) => [...prev, newEntity]);
     setSelectedEntityId(id);
     return id;
-  }, [activeTool, toolParams, display]);
+  }, [activeTool, toolParams, display, pushHistory]);
 
   const renameEntity = useCallback((id: string, newName: string) => {
+    pushHistory();
     setEntities((prev) =>
       prev.map((e) => (e.id === id ? { ...e, name: newName } : e)),
     );
-  }, []);
+  }, [pushHistory]);
 
   const selectEntity = useCallback((id: string | null) => {
     setSelectedEntityId(id);
@@ -228,6 +285,7 @@ export function AppProvider({ children }) {
   }, []);
 
   const reorderEntities = useCallback((fromId: string, toId: string) => {
+    pushHistory();
     setEntities((prev) => {
       const fromIndex = prev.findIndex((e) => e.id === fromId);
       const toIndex = prev.findIndex((e) => e.id === toId);
@@ -238,12 +296,14 @@ export function AppProvider({ children }) {
       next.splice(fromIndex < toIndex ? insertAt + 1 : insertAt, 0, item);
       return next;
     });
-  }, []);
+  }, [pushHistory]);
 
   const deleteEntity = useCallback((id) => {
+    pushHistory();
     setEntities((prev) => prev.filter((e) => e.id !== id));
     setSelectedEntityId((prev) => (prev === id ? null : prev));
-  }, []);
+  }, [pushHistory]);
+  deleteEntityRef.current = deleteEntity;
 
   const moveEntity = useCallback((id, dx, dy) => {
     setEntities((prev) =>
@@ -287,7 +347,10 @@ export function AppProvider({ children }) {
         try {
           const data = JSON.parse(ev.target.result);
           if (data.selectedDisplay) setSelectedDisplay(data.selectedDisplay);
-          if (data.entities) setEntities(data.entities);
+          if (data.entities) {
+            pushHistory();
+            setEntities(data.entities);
+          }
         } catch {
           alert("Invalid project file");
         }
@@ -295,7 +358,7 @@ export function AppProvider({ children }) {
       reader.readAsText(file);
     };
     input.click();
-  }, []);
+  }, [pushHistory]);
 
   // ── Arduino code export ──────────────────────────────────────────────────
   const exportArduino = useCallback(() => {
@@ -386,6 +449,12 @@ export function AppProvider({ children }) {
         // Settings
         grid,
         setGrid,
+        // History
+        pushHistory,
+        undo,
+        redo,
+        canUndo,
+        canRedo,
         // Actions
         saveProject,
         loadProject,
