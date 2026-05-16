@@ -613,6 +613,7 @@ export default function Canvas() {
     deleteEntity,
     pushHistory,
     grid,
+    padding,
     activeTool,
     toolParams,
     createEntityAt,
@@ -661,6 +662,15 @@ export default function Canvas() {
       for (let gy = 0; gy <= ch; gy += grid.size) { ctx.moveTo(0, gy); ctx.lineTo(cw, gy); }
       ctx.stroke();
     }
+    if (padding.enabled) {
+      const p = padding.size;
+      ctx.save();
+      ctx.strokeStyle = "rgba(59,130,246,0.6)";
+      ctx.lineWidth = 0.75;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(p, p, cw - p * 2, ch - p * 2);
+      ctx.restore();
+    }
     const colorMode = display.colorMode ?? "3bit";
     const onImageReady = () => setBitmapTick((t) => t + 1);
     entities.forEach((entity) => {
@@ -676,7 +686,7 @@ export default function Canvas() {
       renderEntity(ctx, ghostEntity, colorMode, () => {});
       ctx.restore();
     }
-  }, [entities, selectedEntityId, cw, ch, grid, display, bitmapTick, activeTool, toolParams, hoverPos]);
+  }, [entities, selectedEntityId, cw, ch, grid, padding, display, bitmapTick, activeTool, toolParams, hoverPos]);
 
   useLayoutEffect(() => {
     draw();
@@ -826,23 +836,39 @@ export default function Canvas() {
     dr.accumY -= dy;
 
     if (dr.mode === "move") {
+      const totalDx = x - dr.startX;
+      const totalDy = y - dr.startY;
+      let targetX = dr.anchorX + totalDx;
+      let targetY = dr.anchorY + totalDy;
+
       if (grid.enabled) {
         const snap = grid.size;
-        const totalDx = x - dr.startX;
-        const totalDy = y - dr.startY;
-        const snappedX = Math.round((dr.anchorX + totalDx) / snap) * snap;
-        const snappedY = Math.round((dr.anchorY + totalDy) / snap) * snap;
-        const entity = entities.find((en) => en.id === dr.id);
-        if (!entity) return;
-        const ep = entity.params;
-        const curX = ep.x ?? ep.cx ?? ep.x0 ?? 0;
-        const curY = ep.y ?? ep.cy ?? ep.y0 ?? 0;
-        const sdx = snappedX - curX;
-        const sdy = snappedY - curY;
-        if (sdx !== 0 || sdy !== 0) moveEntity(dr.id, sdx, sdy);
+        targetX = Math.round(targetX / snap) * snap;
+        targetY = Math.round(targetY / snap) * snap;
       } else {
-        moveEntity(dr.id, dx, dy);
+        targetX = Math.round(targetX);
+        targetY = Math.round(targetY);
       }
+
+      if (padding.enabled) {
+        const ps = padding.size;
+        const THRESH = 8;
+        for (const bx of [ps, cw - ps]) {
+          if (Math.abs(targetX - bx) <= THRESH) { targetX = bx; break; }
+        }
+        for (const by of [ps, ch - ps]) {
+          if (Math.abs(targetY - by) <= THRESH) { targetY = by; break; }
+        }
+      }
+
+      const entity = entities.find((en) => en.id === dr.id);
+      if (!entity) return;
+      const ep = entity.params;
+      const curX = ep.x ?? ep.cx ?? ep.x0 ?? 0;
+      const curY = ep.y ?? ep.cy ?? ep.y0 ?? 0;
+      const sdx = targetX - curX;
+      const sdy = targetY - curY;
+      if (sdx !== 0 || sdy !== 0) moveEntity(dr.id, sdx, sdy);
     } else {
       const entity = entities.find((en) => en.id === dr.id);
       if (!entity) return;

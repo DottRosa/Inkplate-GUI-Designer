@@ -178,6 +178,7 @@ export function AppProvider({ children }) {
     DEFAULT_PARAMS[ENTITY_TYPES.CIRCLE],
   );
   const [grid, setGrid] = useState({ enabled: false, size: 10 });
+  const [padding, setPadding] = useState({ enabled: false, size: 10 });
 
   const entitiesRef = useRef(entities);
   entitiesRef.current = entities;
@@ -458,6 +459,8 @@ export function AppProvider({ children }) {
         // Settings
         grid,
         setGrid,
+        padding,
+        setPadding,
         // History
         pushHistory,
         undo,
