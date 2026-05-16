@@ -57,6 +57,7 @@ export const ENTITY_TYPES = {
   // Shapes
   LINE: "Line",
   RECTANGLE: "Rectangle",
+  ROUND_RECT: "Round rect",
   CIRCLE: "Circle",
   TRIANGLE: "Triangle",
   TEXT: "Text",
@@ -82,6 +83,15 @@ export const DEFAULT_PARAMS = {
     y: 100,
     width: 150,
     height: 100,
+    color: 0,
+    fill: false,
+  },
+  [ENTITY_TYPES.ROUND_RECT]: {
+    x: 100,
+    y: 100,
+    width: 150,
+    height: 100,
+    borderRadius: 16,
     color: 0,
     fill: false,
   },
@@ -127,6 +137,7 @@ export function placeAtParams(type: string, params: Record<string, any>, x: numb
       return { ...p, x0: x - hdx, y0: y - hdy, x1: x + hdx, y1: y + hdy };
     }
     case ENTITY_TYPES.RECTANGLE:
+    case ENTITY_TYPES.ROUND_RECT:
     case ENTITY_TYPES.BITMAP:
     case ENTITY_TYPES.GRAPH:
     case ENTITY_TYPES.TEXT:
@@ -406,6 +417,11 @@ export function AppProvider({ children }) {
         case ENTITY_TYPES.RECTANGLE:
           lines.push(
             `  display.draw${p.fill ? "Filled" : ""}Rect(${p.x}, ${p.y}, ${p.width}, ${p.height}, ${p.color});`,
+          );
+          break;
+        case ENTITY_TYPES.ROUND_RECT:
+          lines.push(
+            `  display.draw${p.fill ? "Filled" : ""}RoundRect(${p.x}, ${p.y}, ${p.width}, ${p.height}, ${p.borderRadius ?? 0}, ${p.color});`,
           );
           break;
         case ENTITY_TYPES.LINE:

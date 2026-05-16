@@ -138,6 +138,24 @@ function RectForm({ p, set }) {
   );
 }
 
+function RoundRectForm({ p, set }) {
+  return (
+    <>
+      <FieldRow>
+        <FieldCell label="X"><NumberInput value={p.x} onChange={(v) => set("x", v)} /></FieldCell>
+        <FieldCell label="Y"><NumberInput value={p.y} onChange={(v) => set("y", v)} /></FieldCell>
+      </FieldRow>
+      <FieldRow>
+        <FieldCell label="Width"><NumberInput value={p.width} min={1} onChange={(v) => set("width", v)} /></FieldCell>
+        <FieldCell label="Height"><NumberInput value={p.height} min={1} onChange={(v) => set("height", v)} /></FieldCell>
+      </FieldRow>
+      <Field label="Border radius"><NumberInput value={p.borderRadius} min={0} onChange={(v) => set("borderRadius", v)} /></Field>
+      <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
+      <CheckboxInput label="Fill" value={p.fill} onChange={(v) => set("fill", v)} />
+    </>
+  );
+}
+
 function CircleForm({ p, set }) {
   return (
     <>
@@ -282,6 +300,7 @@ const FORMS = {
   [ENTITY_TYPES.PENCIL]: PencilForm,
   [ENTITY_TYPES.LINE]: LineForm,
   [ENTITY_TYPES.RECTANGLE]: RectForm,
+  [ENTITY_TYPES.ROUND_RECT]: RoundRectForm,
   [ENTITY_TYPES.CIRCLE]: CircleForm,
   [ENTITY_TYPES.TRIANGLE]: TriangleForm,
   [ENTITY_TYPES.TEXT]: TextForm,

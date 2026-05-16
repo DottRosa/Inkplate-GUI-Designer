@@ -20,6 +20,7 @@ function getHandles(entity) {
         { id: "b", x: p.cx, y: p.cy + p.radius },
       ];
     case ENTITY_TYPES.RECTANGLE:
+    case ENTITY_TYPES.ROUND_RECT:
     case ENTITY_TYPES.BITMAP:
     case ENTITY_TYPES.GRAPH:
     case ENTITY_TYPES.TEXT:
@@ -64,6 +65,7 @@ function applyHandleDrag(entity, handleId, dx, dy) {
       return p;
 
     case ENTITY_TYPES.RECTANGLE:
+    case ENTITY_TYPES.ROUND_RECT:
     case ENTITY_TYPES.BITMAP:
     case ENTITY_TYPES.GRAPH:
     case ENTITY_TYPES.TEXT:
@@ -113,6 +115,7 @@ function applyHandleDrag(entity, handleId, dx, dy) {
 // ─── Shift-constrained resize ─────────────────────────────────────────────
 const RATIO_TYPES = new Set([
   ENTITY_TYPES.RECTANGLE,
+  ENTITY_TYPES.ROUND_RECT,
   ENTITY_TYPES.BITMAP,
   ENTITY_TYPES.GRAPH,
   ENTITY_TYPES.TEXT,
@@ -212,6 +215,14 @@ function renderEntity(ctx, entity, colorMode, onImageReady = () => {}) {
       if (p.fill) ctx.fillRect(p.x, p.y, p.width, p.height);
       else ctx.strokeRect(p.x, p.y, p.width, p.height);
       break;
+    case ENTITY_TYPES.ROUND_RECT: {
+      const r = Math.min(p.borderRadius ?? 0, p.width / 2, p.height / 2);
+      ctx.beginPath();
+      ctx.roundRect(p.x, p.y, p.width, p.height, r);
+      if (p.fill) ctx.fill();
+      else ctx.stroke();
+      break;
+    }
     case ENTITY_TYPES.CIRCLE:
       ctx.beginPath();
       ctx.arc(p.cx, p.cy, p.radius, 0, Math.PI * 2);

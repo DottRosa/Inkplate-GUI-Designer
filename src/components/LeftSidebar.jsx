@@ -36,6 +36,20 @@ const ICONS = {
       />
     </svg>
   ),
+  [ENTITY_TYPES.ROUND_RECT]: (
+    <svg viewBox="0 0 18 18" width="18" height="18">
+      <rect
+        x="2.5"
+        y="4.5"
+        width="13"
+        height="9"
+        rx="3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+    </svg>
+  ),
   [ENTITY_TYPES.CIRCLE]: (
     <svg viewBox="0 0 18 18" width="18" height="18">
       <circle
@@ -178,6 +192,7 @@ const LABELS = {
   [ENTITY_TYPES.SELECT]: "Select / Move",
   [ENTITY_TYPES.LINE]: "Line",
   [ENTITY_TYPES.RECTANGLE]: "Rectangle",
+  [ENTITY_TYPES.ROUND_RECT]: "Round rect",
   [ENTITY_TYPES.CIRCLE]: "Circle",
   [ENTITY_TYPES.TRIANGLE]: "Triangle",
   [ENTITY_TYPES.TEXT]: "Text",
@@ -190,6 +205,7 @@ const LABELS = {
 const SHAPES = [
   ENTITY_TYPES.LINE,
   ENTITY_TYPES.RECTANGLE,
+  ENTITY_TYPES.ROUND_RECT,
   ENTITY_TYPES.CIRCLE,
   ENTITY_TYPES.TRIANGLE,
   ENTITY_TYPES.TEXT,
