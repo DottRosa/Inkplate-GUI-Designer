@@ -6,6 +6,8 @@ export default function Navbar() {
   const {
     selectedDisplay,
     setSelectedDisplay,
+    rotation,
+    setRotation,
     grid,
     setGrid,
     padding,
@@ -62,6 +64,34 @@ export default function Navbar() {
           Load
         </button>
 
+        <span className="text-gray-600 font-mono">|</span>
+
+        <button
+          onClick={exportArduino}
+          className="flex items-center border border-arduino text-arduino gap-1.5 text-sm font-mono font-semibold px-1 py-0.5 rounded transition-colors bg-white hover:opacity-80 cursor-pointer"
+        >
+          <img src={arduinoLogo} alt="" className="w-4 h-4" />
+          Export Arduino Code
+        </button>
+
+        <span className="text-gray-600 font-mono mx-1">|</span>
+
+        <span className="text-sm font-mono text-gray-700">Rotation:</span>
+        <div className="flex">
+          {[0, 1, 2, 3].map((r) => (
+            <button
+              key={r}
+              onClick={() => setRotation(r)}
+              title={`${r * 90}°`}
+              className={`text-xs font-mono px-1.5 py-0.5 border border-gray-400 first:rounded-l last:rounded-r -ml-px first:ml-0 cursor-pointer transition-colors ${
+                rotation === r ? "bg-violet-600 text-white border-violet-600 z-10" : "bg-white text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              {r * 90}°
+            </button>
+          ))}
+        </div>
+
         <span className="text-gray-600 font-mono mx-1">|</span>
 
         <label className="flex items-center gap-1.5 cursor-pointer select-none">
@@ -117,16 +147,6 @@ export default function Navbar() {
           className="w-12 text-sm font-mono px-1 py-0.5 rounded border border-gray-500 bg-gray-700 text-white text-center"
         />
         <span className="text-xs font-mono text-gray-400">px</span>
-
-        <span className="text-gray-600 font-mono mx-1">|</span>
-
-        <button
-          onClick={exportArduino}
-          className="flex items-center border border-arduino text-arduino gap-1.5 text-sm font-mono font-semibold px-1 py-0.5 rounded transition-colors bg-white hover:opacity-80 cursor-pointer"
-        >
-          <img src={arduinoLogo} alt="" className="w-4 h-4" />
-          Export Arduino Code
-        </button>
       </div>
     </header>
   );

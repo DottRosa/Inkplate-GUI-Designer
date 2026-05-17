@@ -616,6 +616,8 @@ export default function Canvas() {
   const dragRef = useRef(null);
   const {
     display,
+    canvasWidth,
+    canvasHeight,
     entities,
     selectedEntityId,
     selectEntity,
@@ -653,8 +655,8 @@ export default function Canvas() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const cw = display.width;
-  const ch = display.height;
+  const cw = canvasWidth;
+  const ch = canvasHeight;
   const scale = Math.min(viewport.w / cw, viewport.h / ch);
 
   // ── Draw ──────────────────────────────────────────────────────────────────
@@ -974,7 +976,7 @@ export default function Canvas() {
           })()}
         </div>
         <div className="text-xs font-mono text-gray-200 select-none">
-          {display.width} × {display.height} px &nbsp;·&nbsp; {Math.round(scale * 100)}%
+          {canvasWidth} × {canvasHeight} px &nbsp;·&nbsp; {Math.round(scale * 100)}%
         </div>
       </div>
     </div>

@@ -130,29 +130,31 @@ export const DEFAULT_PARAMS = {
 // ─── Placement helpers ─────────────────────────────────────────────────────
 export function placeAtParams(type: string, params: Record<string, any>, x: number, y: number): Record<string, any> {
   const p = { ...params };
+  const rx = Math.round(x);
+  const ry = Math.round(y);
   switch (type) {
     case ENTITY_TYPES.LINE: {
       const hdx = Math.round((p.x1 - p.x0) / 2);
       const hdy = Math.round((p.y1 - p.y0) / 2);
-      return { ...p, x0: x - hdx, y0: y - hdy, x1: x + hdx, y1: y + hdy };
+      return { ...p, x0: rx - hdx, y0: ry - hdy, x1: rx + hdx, y1: ry + hdy };
     }
     case ENTITY_TYPES.RECTANGLE:
     case ENTITY_TYPES.ROUND_RECT:
     case ENTITY_TYPES.BITMAP:
     case ENTITY_TYPES.GRAPH:
     case ENTITY_TYPES.TEXT:
-      return { ...p, x: Math.round(x - p.width / 2), y: Math.round(y - p.height / 2) };
+      return { ...p, x: Math.round(rx - p.width / 2), y: Math.round(ry - p.height / 2) };
     case ENTITY_TYPES.CIRCLE:
-      return { ...p, cx: x, cy: y };
+      return { ...p, cx: rx, cy: ry };
     case ENTITY_TYPES.CLOCK:
-      return { ...p, x, y };
+      return { ...p, x: rx, y: ry };
     case ENTITY_TYPES.TRIANGLE: {
       const tcx = Math.round((p.x0 + p.x1 + p.x2) / 3);
       const tcy = Math.round((p.y0 + p.y1 + p.y2) / 3);
-      return { ...p, x0: p.x0 + x - tcx, y0: p.y0 + y - tcy, x1: p.x1 + x - tcx, y1: p.y1 + y - tcy, x2: p.x2 + x - tcx, y2: p.y2 + y - tcy };
+      return { ...p, x0: Math.round(p.x0 + rx - tcx), y0: Math.round(p.y0 + ry - tcy), x1: Math.round(p.x1 + rx - tcx), y1: Math.round(p.y1 + ry - tcy), x2: Math.round(p.x2 + rx - tcx), y2: Math.round(p.y2 + ry - tcy) };
     }
     case ENTITY_TYPES.DIGITAL_CLOCK:
-      return { ...p, x, y };
+      return { ...p, x: rx, y: ry };
     default:
       return p;
   }
@@ -180,8 +182,67 @@ const generateId = (type) => {
   return `${short}${entityCounter++}`;
 };
 
+function encodeBitmap(id: string, p: any): Promise<string[]> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = p.width;
+      canvas.height = p.height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, p.width, p.height);
+      const imgData = ctx.getImageData(0, 0, p.width, p.height);
+
+      for (let i = 0; i < p.height; i++)
+        for (let j = 0; j < p.width; j++) {
+          const idx = 4 * (j + i * p.width);
+          imgData.data[idx] = Math.round(
+            0.3 * imgData.data[idx] + 0.59 * imgData.data[idx + 1] + 0.11 * imgData.data[idx + 2]
+          );
+        }
+
+      for (let i = 1; i < p.height - 1; i++)
+        for (let j = 1; j < p.width - 1; j++) {
+          const idx = 4 * (j + i * p.width);
+          const old = imgData.data[idx];
+          const nw = old & 0xe0;
+          imgData.data[idx] = nw;
+          const err = old - nw;
+          imgData.data[4 * ((j + 1) + i * p.width)] += Math.floor((err * 7) / 16);
+          imgData.data[4 * ((j - 1) + (i + 1) * p.width)] += Math.floor((err * 3) / 16);
+          imgData.data[4 * (j + (i + 1) * p.width)] += Math.floor((err * 5) / 16);
+          imgData.data[4 * ((j + 1) + (i + 1) * p.width)] += Math.floor(err / 16);
+        }
+
+      const lines: string[] = [
+        `int bitmap_${id}_x = ${p.x};`,
+        `int bitmap_${id}_y = ${p.y};`,
+        `const int bitmap_${id}_w = ${p.width};`,
+        `const int bitmap_${id}_h = ${p.height};`,
+        `const uint8_t bitmap_${id}_content[] PROGMEM = {`,
+      ];
+
+      for (let i = 0; i < p.height; i++) {
+        let row = "";
+        let last = 0;
+        for (let j = 0; j < p.width; j++) {
+          const val = imgData.data[4 * (j + p.width * i)];
+          if (j % 2 === 0) last = val & 0xf0;
+          else { last |= (val >> 4) & 0x0f; row += `0x${last.toString(16)},`; last = 0; }
+        }
+        if (p.width % 2 !== 0) row += `0x${last.toString(16)},`;
+        lines.push(row);
+      }
+      lines.push(`};`);
+      resolve(lines);
+    };
+    img.src = p.src;
+  });
+}
+
 export function AppProvider({ children }) {
   const [selectedDisplay, setSelectedDisplay] = useState("inkplate6");
+  const [rotation, setRotation] = useState<0 | 1 | 2 | 3>(0);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState(ENTITY_TYPES.SELECT);
@@ -251,6 +312,8 @@ export function AppProvider({ children }) {
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const display = DISPLAYS[selectedDisplay as keyof typeof DISPLAYS];
+  const canvasWidth  = rotation % 2 === 0 ? display.width  : display.height;
+  const canvasHeight = rotation % 2 === 0 ? display.height : display.width;
   const selectedEntity =
     entities.find((e) => e.id === selectedEntityId) ?? null;
 
@@ -269,12 +332,12 @@ export function AppProvider({ children }) {
   const createEntity = useCallback(() => {
     pushHistory();
     const id = generateId(activeTool);
-    const centered = centerParams(activeTool, toolParams, display);
+    const centered = centerParams(activeTool, toolParams, { width: canvasWidth, height: canvasHeight });
     const newEntity = { id, name: id, type: activeTool, params: centered };
     setEntities((prev) => [...prev, newEntity]);
     setSelectedEntityId(id);
     return id;
-  }, [activeTool, toolParams, display, pushHistory]);
+  }, [activeTool, toolParams, canvasWidth, canvasHeight, pushHistory]);
 
   const createEntityAt = useCallback((x: number, y: number) => {
     pushHistory();
@@ -348,7 +411,7 @@ export function AppProvider({ children }) {
 
   // ── Save / Load ──────────────────────────────────────────────────────────
   const saveProject = useCallback(() => {
-    const data = JSON.stringify({ selectedDisplay, entities }, null, 2);
+    const data = JSON.stringify({ selectedDisplay, rotation, entities }, null, 2);
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -356,7 +419,7 @@ export function AppProvider({ children }) {
     a.download = "inkplate-project.json";
     a.click();
     URL.revokeObjectURL(url);
-  }, [selectedDisplay, entities]);
+  }, [selectedDisplay, rotation, entities]);
 
   const loadProject = useCallback(() => {
     const input = document.createElement("input");
@@ -370,6 +433,7 @@ export function AppProvider({ children }) {
         try {
           const data = JSON.parse(ev.target.result);
           if (data.selectedDisplay) setSelectedDisplay(data.selectedDisplay);
+          if (data.rotation !== undefined) setRotation(data.rotation as 0 | 1 | 2 | 3);
           if (data.entities) {
             pushHistory();
             setEntities(data.entities);
@@ -384,59 +448,198 @@ export function AppProvider({ children }) {
   }, [pushHistory]);
 
   // ── Arduino code export ──────────────────────────────────────────────────
-  const exportArduino = useCallback(() => {
-    const lines = [
+  const exportArduino = useCallback(async () => {
+    const varLines: string[] = [];
+    const drawLines: string[] = [];
+
+    for (const e of entities) {
+      const p = e.params;
+      const id = e.id;
+
+      switch (e.type) {
+        case ENTITY_TYPES.TEXT:
+          drawLines.push(`  display.setCursor(${p.x}, ${p.y});`);
+          drawLines.push(`  display.setTextSize(${p.fontSize});`);
+          drawLines.push(`  display.print("${p.text}");`);
+          break;
+
+        case ENTITY_TYPES.CIRCLE:
+          drawLines.push(
+            `  display.${p.fill ? "fill" : "draw"}Circle(${p.cx}, ${p.cy}, ${p.radius}, ${p.color});`
+          );
+          break;
+
+        case ENTITY_TYPES.RECTANGLE:
+          drawLines.push(
+            `  display.${p.fill ? "fill" : "draw"}Rect(${p.x}, ${p.y}, ${p.width}, ${p.height}, ${p.color});`
+          );
+          break;
+
+        case ENTITY_TYPES.ROUND_RECT:
+          drawLines.push(
+            `  display.${p.fill ? "fill" : "draw"}RoundRect(${p.x}, ${p.y}, ${p.width}, ${p.height}, ${p.borderRadius ?? 0}, ${p.color});`
+          );
+          break;
+
+        case ENTITY_TYPES.LINE:
+          drawLines.push(
+            `  display.drawLine(${p.x0}, ${p.y0}, ${p.x1}, ${p.y1}, ${p.color});`
+          );
+          break;
+
+        case ENTITY_TYPES.TRIANGLE:
+          drawLines.push(
+            `  display.${p.fill ? "fill" : "draw"}Triangle(${p.x0}, ${p.y0}, ${p.x1}, ${p.y1}, ${p.x2}, ${p.y2}, ${p.color});`
+          );
+          break;
+
+        case ENTITY_TYPES.BITMAP: {
+          if (!p.src) break;
+          const bitmapLines = await encodeBitmap(id, p);
+          varLines.push(...bitmapLines);
+          drawLines.push(
+            `  display.drawBitmap3Bit(bitmap_${id}_x, bitmap_${id}_y, bitmap_${id}_content, bitmap_${id}_w, bitmap_${id}_h);`
+          );
+          break;
+        }
+
+        case ENTITY_TYPES.GRAPH: {
+          const n = p.n ?? 32;
+          const data =
+            p.data && p.data.length > 0
+              ? p.data
+              : Array.from({ length: n }, (_, i) => Math.sin((Math.PI * 3 * i) / n));
+          const x1 = p.x, y1 = p.y + p.height, x2 = p.x + p.width, y2 = p.y;
+          varLines.push(
+            `int graph_${id}_n = ${n};`,
+            `int graph_${id}_x1 = ${x1};`,
+            `int graph_${id}_y1 = ${y1};`,
+            `int graph_${id}_x2 = ${x2};`,
+            `int graph_${id}_y2 = ${y2};`,
+            `double graph_${id}_data[128] = ${JSON.stringify(data).replace("[", "{").replace("]", "}")};`,
+          );
+          drawLines.push(
+            `  { // Graph ${id}`,
+            `  int textMargin_${id} = 68;`,
+            `  double minD_${id} = 1e9F, maxD_${id} = -1e9F;`,
+            `  for (int i = 0; i < graph_${id}_n; ++i) { minD_${id} = min(minD_${id}, graph_${id}_data[i]); maxD_${id} = max(maxD_${id}, graph_${id}_data[i]); }`,
+            `  double span_${id} = max(0.3, fabs(maxD_${id} - minD_${id}));`,
+            `  int prevX_${id} = -1, prevY_${id} = -1;`,
+            `  for (int i = 0; i < graph_${id}_n; ++i) {`,
+            `    int tx = graph_${id}_x1 + i * (graph_${id}_x2 - graph_${id}_x1 - textMargin_${id}) / graph_${id}_n;`,
+            `    int ty = graph_${id}_y1 - (int)((graph_${id}_data[i] - minD_${id}) * abs(graph_${id}_y1 - graph_${id}_y2) / span_${id});`,
+            `    if (i) for (int j = 0; j < (graph_${id}_x2 - graph_${id}_x1) / graph_${id}_n + 1; ++j)`,
+            `      display.drawGradientLine(prevX_${id}+j, round(prevY_${id}+(double)(ty-prevY_${id})/((graph_${id}_x2-graph_${id}_x1-textMargin_${id})/graph_${id}_n)*j), prevX_${id}+j, graph_${id}_y1, 3, 7);`,
+            `    prevX_${id} = tx; prevY_${id} = ty;`,
+            `  }`,
+            `  prevX_${id} = -1; prevY_${id} = -1;`,
+            `  for (int i = 0; i < graph_${id}_n; ++i) {`,
+            `    int tx = graph_${id}_x1 + i * (graph_${id}_x2 - graph_${id}_x1 - textMargin_${id}) / graph_${id}_n;`,
+            `    int ty = graph_${id}_y1 - (int)((graph_${id}_data[i] - minD_${id}) * abs(graph_${id}_y1 - graph_${id}_y2) / span_${id});`,
+            `    if (i) display.drawThickLine(prevX_${id}, prevY_${id}, tx, ty, 0, 5.0);`,
+            `    prevX_${id} = tx; prevY_${id} = ty;`,
+            `  }`,
+            `  for (int i = 0; i < 4; ++i) {`,
+            `    display.setFont();`,
+            `    display.drawFastHLine(graph_${id}_x1, graph_${id}_y2+i*(graph_${id}_y1-graph_${id}_y2)/4, graph_${id}_x2-graph_${id}_x1, 4);`,
+            `    display.setCursor(graph_${id}_x2-textMargin_${id}+10, graph_${id}_y1+(4-i)*(graph_${id}_y2-graph_${id}_y1)/4+23);`,
+            `    display.setTextColor(0, 7); display.setTextSize(3);`,
+            `    display.print(String(minD_${id}+(maxD_${id}-minD_${id})*(4-i)/4));`,
+            `  }`,
+            `  for (int i = 0; i < 5; ++i)`,
+            `    display.drawFastVLine(graph_${id}_x1+i*(graph_${id}_x2-graph_${id}_x1)/5, graph_${id}_y2, graph_${id}_y1-graph_${id}_y2, 4);`,
+            `  display.drawFastVLine(graph_${id}_x2-textMargin_${id}+2, graph_${id}_y2, graph_${id}_y1-graph_${id}_y2, 4);`,
+            `  display.drawThickLine(graph_${id}_x1, graph_${id}_y1, graph_${id}_x2, graph_${id}_y1, 0, 3);`,
+            `  }`,
+          );
+          break;
+        }
+
+        case ENTITY_TYPES.CLOCK: {
+          drawLines.push(
+            `  { // Clock ${id}`,
+            `  int clock_cx = ${p.x}, clock_cy = ${p.y}, clock_r = ${p.radius};`,
+            `  int clock_r0 = clock_r * 0.55, clock_r1 = clock_r * 0.65, clock_r2 = clock_r * 0.9;`,
+            `  int clock_h = ${p.h}, clock_m = ${p.m};`,
+            `  display.drawCircle(clock_cx, clock_cy, clock_r, ${p.color});`,
+            `  for (int i = 0; i < 60; ++i) {`,
+            `    double a = (double)i / 60.0 * 2.0 * 3.14159265;`,
+            `    if (i % 5 == 0)`,
+            `      display.drawThickLine(clock_cx+clock_r1*cos(a), clock_cy+clock_r1*sin(a), clock_cx+clock_r*cos(a), clock_cy+clock_r*sin(a), ${p.color}, 3);`,
+            `    else if (clock_r * 2 > 150)`,
+            `      display.drawLine(clock_cx+clock_r1*cos(a), clock_cy+clock_r1*sin(a), clock_cx+clock_r2*cos(a), clock_cy+clock_r2*sin(a), 2);`,
+            `  }`,
+            `  display.drawThickLine(clock_cx, clock_cy, clock_cx+clock_r0*cos((double)(clock_h-3.0+clock_m/60.0)/12.0*2.0*3.14159265), clock_cy+clock_r0*sin((double)(clock_h-3.0+clock_m/60.0)/12.0*2.0*3.14159265), 2, 2);`,
+            `  display.drawThickLine(clock_cx, clock_cy, clock_cx+clock_r2*cos((double)(clock_m-15.0)/60.0*2.0*3.14159265), clock_cy+clock_r2*sin((double)(clock_m-15.0)/60.0*2.0*3.14159265), 2, 2);`,
+            `  }`,
+          );
+          break;
+        }
+
+        case ENTITY_TYPES.DIGITAL_CLOCK: {
+          varLines.push(
+            `int digclock_${id}_h = ${p.h};`,
+            `int digclock_${id}_m = ${p.m};`,
+            `int digclock_${id}_x = ${p.x};`,
+            `int digclock_${id}_y = ${p.y};`,
+            `int digclock_${id}_size = ${p.fontSize};`,
+            `int digclock_${id}_bitmask[] = {119,48,93,121,58,107,111,49,127,59};`,
+            `int digclock_${id}_triX[] = {83,101,108,101,108,277,101,108,277,257,277,108,257,277,286,76,60,98,60,98,80,80,39,60,80,39,55,31,55,73,31,73,52,31,9,52,9,52,20,61,86,80,86,80,233,233,227,80,233,227,252,260,292,305,305,260,240,305,281,240,240,281,260,259,234,276,234,276,256,256,214,234,214,256,237,38,27,60,38,60,207,207,38,212,212,207,230};`,
+            `int digclock_${id}_triY[] = {30,13,60,13,60,14,13,60,14,57,14,60,57,14,29,36,47,61,47,61,198,198,201,47,198,201,219,252,232,253,252,253,390,252,406,390,406,390,416,227,202,249,202,249,203,203,247,249,203,247,224,60,35,49,49,60,200,50,201,200,200,201,220,231,252,252,252,252,403,403,390,252,390,403,415,439,424,392,439,392,394,394,439,439,439,394,424};`,
+            `int digclock_${id}_maxX = 310;`,
+            `int digclock_${id}_maxY = 440;`,
+          );
+          drawLines.push(
+            `  { // Digital Clock ${id}`,
+            `  int dc_temp_${id}[4] = {digclock_${id}_h/10%10, digclock_${id}_h%10, digclock_${id}_m/10%10, digclock_${id}_m%10};`,
+            `  int dc_triCount_${id} = sizeof(digclock_${id}_triX)/sizeof(digclock_${id}_triX[0]);`,
+            `  for (int i = 0; i < 4; ++i)`,
+            `    for (int j = 0; j < dc_triCount_${id}; j += 3) {`,
+            `      int b = digclock_${id}_bitmask[dc_temp_${id}[i]];`,
+            `      if (b & (1 << ((j-1)/(3*4))))`,
+            `        display.fillTriangle(`,
+            `          (int)((float)i*(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*1.1+(float)digclock_${id}_x+(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*(float)digclock_${id}_triX[j]/(float)digclock_${id}_maxX),`,
+            `          (int)((float)digclock_${id}_y+(float)digclock_${id}_size*(float)digclock_${id}_triY[j]/(float)digclock_${id}_maxY),`,
+            `          (int)((float)i*(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*1.1+(float)digclock_${id}_x+(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*(float)digclock_${id}_triX[j+1]/(float)digclock_${id}_maxX),`,
+            `          (int)((float)digclock_${id}_y+(float)digclock_${id}_size*(float)digclock_${id}_triY[j+1]/(float)digclock_${id}_maxY),`,
+            `          (int)((float)i*(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*1.1+(float)digclock_${id}_x+(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*(float)digclock_${id}_triX[j+2]/(float)digclock_${id}_maxX),`,
+            `          (int)((float)digclock_${id}_y+(float)digclock_${id}_size*(float)digclock_${id}_triY[j+2]/(float)digclock_${id}_maxY), 0);`,
+            `    }`,
+            `  int dc_r_${id} = (int)(0.05*(float)digclock_${id}_size);`,
+            `  display.fillCircle((int)((float)digclock_${id}_x+4.0*(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*1.075/2.0),(int)((float)digclock_${id}_y+(float)digclock_${id}_size*0.4),dc_r_${id},0);`,
+            `  display.fillCircle((int)((float)digclock_${id}_x+4.0*(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*1.075/2.0),(int)((float)digclock_${id}_y+(float)digclock_${id}_size*0.6),dc_r_${id},0);`,
+            `  }`,
+          );
+          break;
+        }
+      }
+    }
+
+    const lines: string[] = [
       `// Inkplate GUI Designer export`,
       `// Display: ${display.label}`,
       `#include "Inkplate.h"`,
       `Inkplate display(INKPLATE_1BIT);`,
+    ];
+
+    if (varLines.length > 0) lines.push(``, ...varLines);
+
+    lines.push(
       ``,
       `void setup() {`,
       `  display.begin();`,
+      ...(rotation !== 0 ? [`  display.setRotation(${rotation});`] : []),
       `  display.clearDisplay();`,
       `  display.display();`,
       `}`,
       ``,
       `void loop() {`,
       `  display.clearDisplay();`,
-    ];
-
-    entities.forEach((e) => {
-      const p = e.params;
-      switch (e.type) {
-        case ENTITY_TYPES.TEXT:
-          lines.push(`  display.setCursor(${p.x}, ${p.y});`);
-          lines.push(`  display.setTextSize(${p.fontSize});`);
-          lines.push(`  display.print("${p.text}");`);
-          break;
-        case ENTITY_TYPES.CIRCLE:
-          lines.push(
-            `  display.draw${p.fill ? "Filled" : ""}Circle(${p.cx}, ${p.cy}, ${p.radius}, ${p.color});`,
-          );
-          break;
-        case ENTITY_TYPES.RECTANGLE:
-          lines.push(
-            `  display.draw${p.fill ? "Filled" : ""}Rect(${p.x}, ${p.y}, ${p.width}, ${p.height}, ${p.color});`,
-          );
-          break;
-        case ENTITY_TYPES.ROUND_RECT:
-          lines.push(
-            `  display.draw${p.fill ? "Filled" : ""}RoundRect(${p.x}, ${p.y}, ${p.width}, ${p.height}, ${p.borderRadius ?? 0}, ${p.color});`,
-          );
-          break;
-        case ENTITY_TYPES.LINE:
-          lines.push(
-            `  display.drawLine(${p.x0}, ${p.y0}, ${p.x1}, ${p.y1}, ${p.color});`,
-          );
-          break;
-        default:
-          lines.push(`  // ${e.id}: ${e.type} (manual implementation needed)`);
-      }
-    });
-
-    lines.push(`  display.display();`);
-    lines.push(`  delay(5000);`);
-    lines.push(`}`);
+      ...drawLines,
+      `  display.display();`,
+      `  delay(5000);`,
+      `}`,
+    );
 
     const code = lines.join("\n");
     const blob = new Blob([code], { type: "text/plain" });
@@ -446,7 +649,7 @@ export function AppProvider({ children }) {
     a.download = "inkplate_sketch.ino";
     a.click();
     URL.revokeObjectURL(url);
-  }, [entities, display]);
+  }, [entities, display, rotation]);
 
   return (
     <AppContext.Provider
@@ -455,6 +658,10 @@ export function AppProvider({ children }) {
         selectedDisplay,
         setSelectedDisplay,
         display,
+        rotation,
+        setRotation,
+        canvasWidth,
+        canvasHeight,
         // Entities
         entities,
         selectedEntityId,

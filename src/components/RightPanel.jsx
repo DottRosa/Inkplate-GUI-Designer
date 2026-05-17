@@ -31,7 +31,7 @@ function NumberInput({ value, onChange, min, max }) {
       value={value ?? ""}
       min={min}
       max={max}
-      onChange={(e) => onChange(Number(e.target.value))}
+      onChange={(e) => onChange(Math.round(Number(e.target.value)))}
       className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-violet-400 bg-white"
     />
   );
