@@ -630,6 +630,8 @@ export default function Canvas() {
     activeTool,
     toolParams,
     createEntityAt,
+    zoom,
+    setZoom,
   } = useApp();
 
   const [hoverPos, setHoverPos] = useState(null);
@@ -655,9 +657,23 @@ export default function Canvas() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const handler = (e) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      setZoom((prev) => Math.min(8, Math.max(0.1, prev * factor)));
+    };
+    canvas.addEventListener("wheel", handler, { passive: false });
+    return () => canvas.removeEventListener("wheel", handler);
+  }, [setZoom]);
+
   const cw = canvasWidth;
   const ch = canvasHeight;
-  const scale = Math.min(viewport.w / cw, viewport.h / ch);
+  const fitScale = Math.min(viewport.w / cw, viewport.h / ch);
+  const scale = fitScale * zoom;
 
   // ── Draw ──────────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
@@ -911,7 +927,8 @@ export default function Canvas() {
   };
 
   return (
-    <div className="flex-1 bg-gray-400 flex items-center justify-center overflow-hidden">
+    <div className="flex-1 bg-gray-400 overflow-auto">
+      <div className="min-h-full min-w-full flex items-center justify-center p-6">
       <div className="flex flex-col items-center gap-2">
         <div
           className="relative shadow-2xl"
@@ -976,8 +993,9 @@ export default function Canvas() {
           })()}
         </div>
         <div className="text-xs font-mono text-gray-200 select-none">
-          {canvasWidth} × {canvasHeight} px &nbsp;·&nbsp; {Math.round(scale * 100)}%
+          {canvasWidth} × {canvasHeight} px &nbsp;·&nbsp; {Math.round(zoom * 100)}%
         </div>
+      </div>
       </div>
     </div>
   );

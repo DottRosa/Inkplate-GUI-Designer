@@ -251,6 +251,7 @@ export function AppProvider({ children }) {
   );
   const [grid, setGrid] = useState({ enabled: false, size: 10 });
   const [padding, setPadding] = useState({ enabled: false, size: 10 });
+  const [zoom, setZoom] = useState(1.0);
 
   const entitiesRef = useRef(entities);
   entitiesRef.current = entities;
@@ -684,6 +685,8 @@ export function AppProvider({ children }) {
         setGrid,
         padding,
         setPadding,
+        zoom,
+        setZoom,
         // History
         pushHistory,
         undo,
