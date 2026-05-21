@@ -2,28 +2,27 @@
 
 A visual GUI designer for [Inkplate](https://soldered.com/inkplate/) e-paper displays. Draw your layout in the browser, export ready-to-compile Arduino code.
 
-![Empty canvas with toolbar and layer panel](demo-1.png)
-![Canvas with shapes and active grid](demo-2.png)
-![Entity selected — properties in right panel](demo-3.png)
-![Inkplate 6COLOR with 7-color palette active](demo-4.png)
+![](demo-1.png)
+![](demo-2.png)
+![](demo-3.png)
 
 ## Supported boards
 
-| Board | Resolution | Color mode |
-|---|---|---|
-| Inkplate 2 | 212 × 104 | Black / White / Red |
-| Inkplate 4 | 400 × 300 | Black / White / Red |
-| Inkplate 4TEMPERA | 600 × 600 | 8 grayscale levels |
-| Inkplate 5 | 960 × 540 | 8 grayscale levels |
-| Inkplate 5V2 | 1280 × 720 | 8 grayscale levels |
-| Inkplate 6 | 800 × 600 | 8 grayscale levels |
-| Inkplate 6COLOR | 600 × 448 | 7 colors |
-| Inkplate 6FLICK | 1024 × 758 | 8 grayscale levels |
-| Inkplate 6MOTION | 1024 × 758 | 8 grayscale levels |
-| Inkplate 6PLUS | 1024 × 758 | 8 grayscale levels |
-| Inkplate 7 | 640 × 384 | Black / White / Red |
-| Inkplate 10 | 1200 × 825 | 8 grayscale levels |
-| Inkplate 13SPECTRA | 1600 × 1200 | 6 colors |
+| Board              | Resolution  | Color mode          |
+| ------------------ | ----------- | ------------------- |
+| Inkplate 2         | 212 × 104   | Black / White / Red |
+| Inkplate 4         | 400 × 300   | Black / White / Red |
+| Inkplate 4TEMPERA  | 600 × 600   | 8 grayscale levels  |
+| Inkplate 5         | 960 × 540   | 8 grayscale levels  |
+| Inkplate 5V2       | 1280 × 720  | 8 grayscale levels  |
+| Inkplate 6         | 800 × 600   | 8 grayscale levels  |
+| Inkplate 6COLOR    | 600 × 448   | 7 colors            |
+| Inkplate 6FLICK    | 1024 × 758  | 8 grayscale levels  |
+| Inkplate 6MOTION   | 1024 × 758  | 8 grayscale levels  |
+| Inkplate 6PLUS     | 1024 × 758  | 8 grayscale levels  |
+| Inkplate 7         | 640 × 384   | Black / White / Red |
+| Inkplate 10        | 1200 × 825  | 8 grayscale levels  |
+| Inkplate 13SPECTRA | 1600 × 1200 | 6 colors            |
 
 The color palette in the toolbar updates automatically based on the selected board.
 
