@@ -2,6 +2,11 @@
 
 A visual GUI designer for [Inkplate](https://soldered.com/inkplate/) e-paper displays. Draw your layout in the browser, export ready-to-compile Arduino code.
 
+![Empty canvas with toolbar and layer panel](demo-1.png)
+![Canvas with shapes and active grid](demo-2.png)
+![Entity selected — properties in right panel](demo-3.png)
+![Inkplate 6COLOR with 7-color palette active](demo-4.png)
+
 ## Supported boards
 
 | Board | Resolution | Color mode |
