@@ -182,63 +182,6 @@ const generateId = (type) => {
   return `${short}${entityCounter++}`;
 };
 
-function encodeBitmap(id: string, p: any): Promise<string[]> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = p.width;
-      canvas.height = p.height;
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, p.width, p.height);
-      const imgData = ctx.getImageData(0, 0, p.width, p.height);
-
-      for (let i = 0; i < p.height; i++)
-        for (let j = 0; j < p.width; j++) {
-          const idx = 4 * (j + i * p.width);
-          imgData.data[idx] = Math.round(
-            0.3 * imgData.data[idx] + 0.59 * imgData.data[idx + 1] + 0.11 * imgData.data[idx + 2]
-          );
-        }
-
-      for (let i = 1; i < p.height - 1; i++)
-        for (let j = 1; j < p.width - 1; j++) {
-          const idx = 4 * (j + i * p.width);
-          const old = imgData.data[idx];
-          const nw = old & 0xe0;
-          imgData.data[idx] = nw;
-          const err = old - nw;
-          imgData.data[4 * ((j + 1) + i * p.width)] += Math.floor((err * 7) / 16);
-          imgData.data[4 * ((j - 1) + (i + 1) * p.width)] += Math.floor((err * 3) / 16);
-          imgData.data[4 * (j + (i + 1) * p.width)] += Math.floor((err * 5) / 16);
-          imgData.data[4 * ((j + 1) + (i + 1) * p.width)] += Math.floor(err / 16);
-        }
-
-      const lines: string[] = [
-        `int bitmap_${id}_x = ${p.x};`,
-        `int bitmap_${id}_y = ${p.y};`,
-        `const int bitmap_${id}_w = ${p.width};`,
-        `const int bitmap_${id}_h = ${p.height};`,
-        `const uint8_t bitmap_${id}_content[] PROGMEM = {`,
-      ];
-
-      for (let i = 0; i < p.height; i++) {
-        let row = "";
-        let last = 0;
-        for (let j = 0; j < p.width; j++) {
-          const val = imgData.data[4 * (j + p.width * i)];
-          if (j % 2 === 0) last = val & 0xf0;
-          else { last |= (val >> 4) & 0x0f; row += `0x${last.toString(16)},`; last = 0; }
-        }
-        if (p.width % 2 !== 0) row += `0x${last.toString(16)},`;
-        lines.push(row);
-      }
-      lines.push(`};`);
-      resolve(lines);
-    };
-    img.src = p.src;
-  });
-}
 
 export function AppProvider({ children }) {
   const [selectedDisplay, setSelectedDisplay] = useState("inkplate6");
@@ -449,7 +392,16 @@ export function AppProvider({ children }) {
   }, [pushHistory]);
 
   // ── Arduino code export ──────────────────────────────────────────────────
-  const exportArduino = useCallback(async () => {
+  const exportArduino = useCallback(() => {
+    const colorMode = display.colorMode;
+
+    const inkplateConstructor = (() => {
+      if (colorMode === "3bit") return "Inkplate display(INKPLATE_3BIT);";
+      if (colorMode === "7color" || colorMode === "6color") return "Inkplate display;";
+      return "Inkplate display(INKPLATE_1BIT);";
+    })();
+
+    const bitmapIncludes: string[] = [];
     const varLines: string[] = [];
     const drawLines: string[] = [];
 
@@ -458,11 +410,31 @@ export function AppProvider({ children }) {
       const id = e.id;
 
       switch (e.type) {
-        case ENTITY_TYPES.TEXT:
-          drawLines.push(`  display.setCursor(${p.x}, ${p.y});`);
-          drawLines.push(`  display.setTextSize(${p.fontSize});`);
-          drawLines.push(`  display.print("${p.text}");`);
+        case ENTITY_TYPES.TEXT: {
+          const fontSize = p.fontSize ?? 2;
+          const charW = 6 * fontSize;
+          const charH = 8 * fontSize;
+          const boxW = p.width ?? 200;
+          const boxH = p.height ?? 60;
+          const words = (p.text ?? "").split(" ");
+          const wrappedLines: string[] = [];
+          let cur = words[0] ?? "";
+          for (let i = 1; i < words.length; i++) {
+            const test = cur + " " + words[i];
+            if (test.length * charW <= boxW) cur = test;
+            else { wrappedLines.push(cur); cur = words[i]; }
+          }
+          if (cur) wrappedLines.push(cur);
+          drawLines.push(`  display.setFont();`);
+          drawLines.push(`  display.setTextColor(${p.color});`);
+          drawLines.push(`  display.setTextSize(${fontSize});`);
+          wrappedLines.forEach((line, i) => {
+            if ((i + 1) * charH > boxH) return;
+            drawLines.push(`  display.setCursor(${p.x}, ${p.y + i * charH});`);
+            drawLines.push(`  display.print("${line}");`);
+          });
           break;
+        }
 
         case ENTITY_TYPES.CIRCLE:
           drawLines.push(
@@ -483,9 +455,15 @@ export function AppProvider({ children }) {
           break;
 
         case ENTITY_TYPES.LINE:
-          drawLines.push(
-            `  display.drawLine(${p.x0}, ${p.y0}, ${p.x1}, ${p.y1}, ${p.color});`
-          );
+          if ((p.thickness ?? 1) > 1) {
+            drawLines.push(
+              `  display.drawThickLine(${p.x0}, ${p.y0}, ${p.x1}, ${p.y1}, ${p.color}, ${p.thickness});`
+            );
+          } else {
+            drawLines.push(
+              `  display.drawLine(${p.x0}, ${p.y0}, ${p.x1}, ${p.y1}, ${p.color});`
+            );
+          }
           break;
 
         case ENTITY_TYPES.TRIANGLE:
@@ -495,12 +473,18 @@ export function AppProvider({ children }) {
           break;
 
         case ENTITY_TYPES.BITMAP: {
-          if (!p.src) break;
-          const bitmapLines = await encodeBitmap(id, p);
-          varLines.push(...bitmapLines);
-          drawLines.push(
-            `  display.drawBitmap3Bit(bitmap_${id}_x, bitmap_${id}_y, bitmap_${id}_content, bitmap_${id}_w, bitmap_${id}_h);`
+          bitmapIncludes.push(
+            `// Image '${id}': convert your image with https://imageconverter.soldered.com`,
+            `// and place the generated '${id}.h' next to this sketch.`,
+            `#include "${id}.h"`,
           );
+          if (colorMode === "3bit") {
+            drawLines.push(`  display.drawBitmap3Bit(${p.x}, ${p.y}, ${id}, ${p.width}, ${p.height});`);
+          } else if (colorMode === "7color" || colorMode === "6color") {
+            drawLines.push(`  display.drawBitmap(${p.x}, ${p.y}, ${id}, ${p.width}, ${p.height});`);
+          } else {
+            drawLines.push(`  display.drawBitmap(${p.x}, ${p.y}, ${id}, ${p.width}, ${p.height}, 0);`);
+          }
           break;
         }
 
@@ -604,11 +588,11 @@ export function AppProvider({ children }) {
             `          (int)((float)i*(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*1.1+(float)digclock_${id}_x+(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*(float)digclock_${id}_triX[j+1]/(float)digclock_${id}_maxX),`,
             `          (int)((float)digclock_${id}_y+(float)digclock_${id}_size*(float)digclock_${id}_triY[j+1]/(float)digclock_${id}_maxY),`,
             `          (int)((float)i*(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*1.1+(float)digclock_${id}_x+(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*(float)digclock_${id}_triX[j+2]/(float)digclock_${id}_maxX),`,
-            `          (int)((float)digclock_${id}_y+(float)digclock_${id}_size*(float)digclock_${id}_triY[j+2]/(float)digclock_${id}_maxY), 0);`,
+            `          (int)((float)digclock_${id}_y+(float)digclock_${id}_size*(float)digclock_${id}_triY[j+2]/(float)digclock_${id}_maxY), ${p.color});`,
             `    }`,
             `  int dc_r_${id} = (int)(0.05*(float)digclock_${id}_size);`,
-            `  display.fillCircle((int)((float)digclock_${id}_x+4.0*(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*1.075/2.0),(int)((float)digclock_${id}_y+(float)digclock_${id}_size*0.4),dc_r_${id},0);`,
-            `  display.fillCircle((int)((float)digclock_${id}_x+4.0*(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*1.075/2.0),(int)((float)digclock_${id}_y+(float)digclock_${id}_size*0.6),dc_r_${id},0);`,
+            `  display.fillCircle((int)((float)digclock_${id}_x+4.0*(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*1.075/2.0),(int)((float)digclock_${id}_y+(float)digclock_${id}_size*0.4),dc_r_${id},${p.color});`,
+            `  display.fillCircle((int)((float)digclock_${id}_x+4.0*(float)digclock_${id}_maxX/(float)digclock_${id}_maxY*(float)digclock_${id}_size*1.075/2.0),(int)((float)digclock_${id}_y+(float)digclock_${id}_size*0.6),dc_r_${id},${p.color});`,
             `  }`,
           );
           break;
@@ -620,7 +604,9 @@ export function AppProvider({ children }) {
       `// Inkplate GUI Designer export`,
       `// Display: ${display.label}`,
       `#include "Inkplate.h"`,
-      `Inkplate display(INKPLATE_1BIT);`,
+      ...bitmapIncludes,
+      ``,
+      inkplateConstructor,
     ];
 
     if (varLines.length > 0) lines.push(``, ...varLines);
@@ -631,14 +617,12 @@ export function AppProvider({ children }) {
       `  display.begin();`,
       ...(rotation !== 0 ? [`  display.setRotation(${rotation});`] : []),
       `  display.clearDisplay();`,
+      ...drawLines,
       `  display.display();`,
       `}`,
       ``,
       `void loop() {`,
-      `  display.clearDisplay();`,
-      ...drawLines,
-      `  display.display();`,
-      `  delay(5000);`,
+      `  delay(1000);`,
       `}`,
     );
 
