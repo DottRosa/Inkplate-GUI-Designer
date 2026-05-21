@@ -338,9 +338,10 @@ function EntityItem({ entity, selected, onClick, onDelete, onDragStart, onDragOv
 }
 
 function LayersPanel() {
-  const { entities, selectedEntityId, selectEntity, deleteEntity, reorderEntities } = useApp();
+  const { entities, selectedEntityId, selectEntity, deleteEntity, clearBoard, reorderEntities } = useApp();
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
+  const [confirming, setConfirming] = useState(false);
 
   const handleDrop = (toId) => {
     if (dragId && dragId !== toId) reorderEntities(dragId, toId);
@@ -348,13 +349,53 @@ function LayersPanel() {
     setDragOverId(null);
   };
 
+  const handleClearClick = () => {
+    if (entities.length === 0) return;
+    setConfirming(true);
+  };
+
+  const handleConfirm = () => {
+    clearBoard();
+    setConfirming(false);
+  };
+
   const reversed = [...entities].reverse();
 
   return (
     <div className="border-t border-gray-200 flex flex-col" style={{ height: 180, flexShrink: 0 }}>
-      <p className="font-bold text-xs font-mono text-gray-600 uppercase tracking-wider px-3 py-1.5 shrink-0 select-none">
-        Layers
-      </p>
+      <div className="flex items-center justify-between px-3 py-1.5 shrink-0">
+        <p className="font-bold text-xs font-mono text-gray-600 uppercase tracking-wider select-none">
+          Layers
+        </p>
+        {confirming ? (
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] font-mono text-gray-500 select-none">Clear all?</span>
+            <button
+              onClick={handleConfirm}
+              className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-red-500 text-white hover:bg-red-600 transition-colors"
+            >
+              Yes
+            </button>
+            <button
+              onClick={() => setConfirming(false)}
+              className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+            >
+              No
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleClearClick}
+            disabled={entities.length === 0}
+            title="Clear all layers"
+            className="text-gray-400 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none">
+              <path d="M2 4h12M5 4V2.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 .5.5V4M6 7v5M10 7v5M3 4l.8 9a.5.5 0 0 0 .5.5h7.4a.5.5 0 0 0 .5-.5L13 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
+      </div>
       <div className="overflow-y-auto px-2 pb-2">
         {reversed.length === 0 && (
           <p className="text-xs text-gray-400 font-mono italic px-1">No entities yet</p>

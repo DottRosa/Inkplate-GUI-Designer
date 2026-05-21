@@ -335,6 +335,12 @@ export function AppProvider({ children }) {
   }, [pushHistory]);
   deleteEntityRef.current = deleteEntity;
 
+  const clearBoard = useCallback(() => {
+    pushHistory();
+    setEntities([]);
+    setSelectedEntityId(null);
+  }, [pushHistory]);
+
   const moveEntity = useCallback((id, dx, dy) => {
     setEntities((prev) =>
       prev.map((e) => {
@@ -656,6 +662,7 @@ export function AppProvider({ children }) {
         selectEntity,
         updateEntity,
         deleteEntity,
+        clearBoard,
         reorderEntities,
         moveEntity,
         renameEntity,
