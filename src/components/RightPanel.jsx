@@ -117,6 +117,10 @@ function LineForm({ p, set }) {
       </FieldRow>
       <Field label="Thickness"><NumberInput value={p.thickness} min={1} onChange={(v) => set("thickness", v)} /></Field>
       <Field label="Color"><ColorSlider value={p.color} onChange={(v) => set("color", v)} /></Field>
+      <CheckboxInput label="Gradient" value={p.gradient} onChange={(v) => set("gradient", v)} />
+      {p.gradient && (
+        <Field label="Color end"><ColorSlider value={p.colorEnd} onChange={(v) => set("colorEnd", v)} /></Field>
+      )}
     </>
   );
 }

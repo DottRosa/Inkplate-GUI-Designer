@@ -206,6 +206,12 @@ function renderEntity(ctx, entity, colorMode, onImageReady = () => {}) {
 
   switch (entity.type) {
     case ENTITY_TYPES.LINE:
+      if (p.gradient) {
+        const grad = ctx.createLinearGradient(p.x0, p.y0, p.x1, p.y1);
+        grad.addColorStop(0, c);
+        grad.addColorStop(1, colorToCSS(p.colorEnd ?? p.color, colorMode));
+        ctx.strokeStyle = grad;
+      }
       ctx.beginPath();
       ctx.moveTo(p.x0, p.y0);
       ctx.lineTo(p.x1, p.y1);

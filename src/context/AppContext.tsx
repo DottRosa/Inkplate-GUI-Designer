@@ -77,6 +77,8 @@ export const DEFAULT_PARAMS = {
     y1: 200,
     color: 0,
     thickness: 1,
+    gradient: false,
+    colorEnd: 0,
   },
   [ENTITY_TYPES.RECTANGLE]: {
     x: 100,
@@ -460,10 +462,23 @@ export function AppProvider({ children }) {
           );
           break;
 
-        case ENTITY_TYPES.LINE:
-          if ((p.thickness ?? 1) > 1) {
+        case ENTITY_TYPES.LINE: {
+          const thick = p.thickness ?? 1;
+          const colorEnd = p.colorEnd ?? p.color;
+          if (p.gradient && thick > 1) {
             drawLines.push(
-              `  display.drawThickLine(${p.x0}, ${p.y0}, ${p.x1}, ${p.y1}, ${p.color}, ${p.thickness});`
+              `  { float _len_${id} = sqrt(pow(${p.x1}-${p.x0},2)+pow(${p.y1}-${p.y0},2)); if(_len_${id}<1)_len_${id}=1;`,
+              `  float _nx_${id} = -(${p.y1}-${p.y0})/_len_${id}, _ny_${id} = (${p.x1}-${p.x0})/_len_${id};`,
+              `  for(int _i=-${Math.floor(thick/2)};_i<=${Math.floor(thick/2)};_i++)`,
+              `    display.drawGradientLine(${p.x0}+round(_nx_${id}*_i),${p.y0}+round(_ny_${id}*_i),${p.x1}+round(_nx_${id}*_i),${p.y1}+round(_ny_${id}*_i),${p.color},${colorEnd}); }`,
+            );
+          } else if (p.gradient) {
+            drawLines.push(
+              `  display.drawGradientLine(${p.x0}, ${p.y0}, ${p.x1}, ${p.y1}, ${p.color}, ${colorEnd});`
+            );
+          } else if (thick > 1) {
+            drawLines.push(
+              `  display.drawThickLine(${p.x0}, ${p.y0}, ${p.x1}, ${p.y1}, ${p.color}, ${thick});`
             );
           } else {
             drawLines.push(
@@ -471,6 +486,7 @@ export function AppProvider({ children }) {
             );
           }
           break;
+        }
 
         case ENTITY_TYPES.TRIANGLE:
           drawLines.push(
