@@ -625,8 +625,12 @@ export default function Canvas() {
     updateEntity,
     deleteEntity,
     pushHistory,
+    rotation,
+    setRotation,
     grid,
+    setGrid,
     padding,
+    setPadding,
     activeTool,
     toolParams,
     createEntityAt,
@@ -638,7 +642,7 @@ export default function Canvas() {
 
   const FRAME_PAD = 48; // 24px padding each side of device frame
   const PANEL_W = 400;
-  const NAVBAR_H = 80;
+  const NAVBAR_H = 46;
   const V_MARGIN = 48; // breathing room top/bottom
 
   const [bitmapTick, setBitmapTick] = useState(0);
@@ -927,75 +931,157 @@ export default function Canvas() {
   };
 
   return (
-    <div className="flex-1 bg-gray-400 overflow-auto">
-      <div className="min-h-full min-w-full flex items-center justify-center p-6">
-      <div className="flex flex-col items-center gap-2">
-        <div
-          className="relative shadow-2xl"
-          style={{
-            padding: "24px",
-            background: "linear-gradient(145deg, #888, #666)",
-            borderRadius: "8px",
-            boxShadow:
-              "0 8px 32px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.1)",
-          }}
-        >
-          <canvas
-            ref={canvasRef}
-            width={cw}
-            height={ch}
+    <div className="flex-1 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gray-400 overflow-auto">
+        <div className="min-h-full min-w-full flex items-center justify-center p-6">
+          <div
+            className="relative shadow-2xl"
             style={{
-              display: "block",
-              width: cw * scale,
-              height: ch * scale,
-              imageRendering: "pixelated",
+              padding: "24px",
+              background: "linear-gradient(145deg, #888, #666)",
+              borderRadius: "8px",
+              boxShadow:
+                "0 8px 32px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.1)",
             }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerLeave}
-          />
-          {selectedEntityId && (() => {
-            const sel = entities.find((e) => e.id === selectedEntityId);
-            if (!sel) return null;
-            const { bx, by, bw } = getEntityBBox(sel);
-            const CANVAS_PAD = 24;
-            const btnX = CANVAS_PAD + (bx + bw) * scale + 10;
-            const btnY = CANVAS_PAD + by * scale - 10;
-            return (
-              <button
-                key={selectedEntityId}
-                onPointerDown={(e) => { e.stopPropagation(); deleteEntity(selectedEntityId); }}
-                style={{
-                  position: "absolute",
-                  left: btnX,
-                  top: btnY,
-                  transform: "translate(-50%, -50%)",
-                  width: 20,
-                  height: 20,
-                  borderRadius: "50%",
-                  background: "#ef4444",
-                  border: "none",
-                  color: "#fff",
-                  fontSize: 12,
-                  lineHeight: 1,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: 0,
-                  zIndex: 10,
-                }}
-              >
-                ×
-              </button>
-            );
-          })()}
-        </div>
-        <div className="text-xs font-mono text-gray-200 select-none">
-          {canvasWidth} × {canvasHeight} px &nbsp;·&nbsp; {Math.round(zoom * 100)}%
+          >
+            <canvas
+              ref={canvasRef}
+              width={cw}
+              height={ch}
+              style={{
+                display: "block",
+                width: cw * scale,
+                height: ch * scale,
+                imageRendering: "pixelated",
+              }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerLeave}
+            />
+            {selectedEntityId && (() => {
+              const sel = entities.find((e) => e.id === selectedEntityId);
+              if (!sel) return null;
+              const { bx, by, bw } = getEntityBBox(sel);
+              const CANVAS_PAD = 24;
+              const btnX = CANVAS_PAD + (bx + bw) * scale + 10;
+              const btnY = CANVAS_PAD + by * scale - 10;
+              return (
+                <button
+                  key={selectedEntityId}
+                  onPointerDown={(e) => { e.stopPropagation(); deleteEntity(selectedEntityId); }}
+                  style={{
+                    position: "absolute",
+                    left: btnX,
+                    top: btnY,
+                    transform: "translate(-50%, -50%)",
+                    width: 20,
+                    height: 20,
+                    borderRadius: "50%",
+                    background: "#ef4444",
+                    border: "none",
+                    color: "#fff",
+                    fontSize: 12,
+                    lineHeight: 1,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 0,
+                    zIndex: 10,
+                  }}
+                >
+                  ×
+                </button>
+              );
+            })()}
+          </div>
         </div>
       </div>
+
+      {/* Canvas controls bottom bar */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 px-3 py-1.5 bg-gray-900/85 backdrop-blur-sm rounded-full text-white text-xs font-mono shadow-lg select-none whitespace-nowrap">
+        {/* Rotation */}
+        {[0, 1, 2, 3].map((r) => (
+          <button
+            key={r}
+            onClick={() => setRotation(r)}
+            title={`${r * 90}°`}
+            className={`px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+              rotation === r ? "bg-violet-500 text-white" : "text-gray-400 hover:bg-white/15 hover:text-white"
+            }`}
+          >
+            {r * 90}°
+          </button>
+        ))}
+
+        <span className="text-gray-600 mx-1">|</span>
+
+        {/* Grid */}
+        <label className="flex items-center gap-1 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={grid.enabled}
+            onChange={(e) => setGrid((g) => ({ ...g, enabled: e.target.checked }))}
+            className="w-3 h-3 accent-yellow-400"
+          />
+          <span className="text-gray-300">Grid</span>
+        </label>
+        <input
+          type="number"
+          min={10}
+          max={50}
+          value={grid.size}
+          onChange={(e) => setGrid((g) => ({ ...g, size: Math.max(10, parseInt(e.target.value) || 10) }))}
+          className="w-10 text-center bg-white/10 border border-white/20 rounded px-1 py-0.5 text-white"
+        />
+
+        <span className="text-gray-600 mx-1">|</span>
+
+        {/* Padding */}
+        <label className="flex items-center gap-1 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={padding.enabled}
+            onChange={(e) => setPadding((p) => ({ ...p, enabled: e.target.checked }))}
+            className="w-3 h-3 accent-blue-400"
+          />
+          <span className="text-gray-300">Padding</span>
+        </label>
+        <input
+          type="number"
+          min={1}
+          max={100}
+          value={padding.size}
+          onChange={(e) => setPadding((p) => ({ ...p, size: Math.max(1, parseInt(e.target.value) || 1) }))}
+          className="w-10 text-center bg-white/10 border border-white/20 rounded px-1 py-0.5 text-white"
+        />
+
+        <span className="text-gray-600 mx-1">|</span>
+
+        {/* Zoom */}
+        <button
+          onClick={() => setZoom((z) => Math.max(0.1, z / 1.25))}
+          className="px-1.5 py-0.5 rounded cursor-pointer hover:bg-white/15 text-gray-300 hover:text-white transition-colors"
+        >
+          −
+        </button>
+        <span className="w-10 text-center text-gray-200">{Math.round(zoom * 100)}%</span>
+        <button
+          onClick={() => setZoom((z) => Math.min(8, z * 1.25))}
+          className="px-1.5 py-0.5 rounded cursor-pointer hover:bg-white/15 text-gray-300 hover:text-white transition-colors"
+        >
+          +
+        </button>
+        <button
+          onClick={() => setZoom(1)}
+          className="px-2 py-0.5 rounded cursor-pointer hover:bg-white/15 text-gray-400 hover:text-white transition-colors ml-0.5"
+        >
+          1:1
+        </button>
+
+        <span className="text-gray-600 mx-1">|</span>
+        <span className="text-gray-500">{canvasWidth} × {canvasHeight}</span>
       </div>
     </div>
   );
